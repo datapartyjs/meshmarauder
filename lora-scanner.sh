@@ -5,7 +5,7 @@ PRESET=()
 INTERVAL=60
 
 usage() {
-    echo "Usage: $0 [-D DEVICE] [-p PRESET]...  [--verbose] [-h]"
+    echo "Usage: $0 [-D DEVICE] [-p PRESET]... [-i INTERVAL] [-h]"
     echo
     echo "Options:"
     echo "  -D DEVICE     Serial Device of lorapipe radio (required)"
@@ -17,6 +17,8 @@ usage() {
 
 error_exit() {
     echo "Error: $1" >&2
+    usage
+    exit 1
 }
 
 # Parse arguments
@@ -25,8 +27,8 @@ while [[ "$#" -gt 0 ]]; do
         -D)
             shift
             [[ -z "$1" || "$1" =~ ^- ]] && error_exit "Missing value for -D"
-            [[ ! -e "$DEVICE" ]] && error_exit "'$DEVICE' does not exist."
             DEVICE="$1"
+            [[ ! -e "$DEVICE" ]] && error_exit "Device '$DEVICE' does not exist."
             ;;
         -i)
             shift
@@ -37,6 +39,7 @@ while [[ "$#" -gt 0 ]]; do
             INTERVAL="$1"
             ;;
         -p)
+            shift
             [[ -z "$1" || "$1" =~ ^- ]] && error_exit "Missing value for -p"
             PRESET+=("$1")
             ;;
@@ -51,8 +54,8 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # Validate required arguments
-if [[ ! -f "$DEVICE" ]]; then
-    error_exit "'$DEVICE' is not a valid file."
+if [[ -z "$DEVICE" ]]; then
+    error_exit "Device argument was not specified after -D"
 fi
 
 if [[ ${#PRESET[@]} -eq 0 ]]; then
@@ -60,19 +63,21 @@ if [[ ${#PRESET[@]} -eq 0 ]]; then
 fi
 
 # Do the thing
-exec 3< "$DEVICE"  # Shove device into a file descriptor
+exec 3<> "$DEVICE"  # Shove device into a file descriptor
 last_trigger_time=$(date +%s)  # Set start time
 
 change_preset() {
-    preset_cmd="radio $1"
+    preset_cmd="set radio $1"
     echo "[$0] sending command: $preset_cmd"
-    echo "$preset_cmd\r\n" > "$DEVICE"
+    printf "$preset_cmd\r\n" >&3
     IFS= read -r -u 3 line
+    echo "[$0] command recieved: $line"
+    IFS= read -r -t 1 -u 3 line
     echo "[$0] command response: $line"
 
     # TODO: fix this in the firmware and remove me
     echo "[$0] Rebooting to apply radio settings"
-    echo "reboot\r\n"
+    printf "reboot\r\n" >&3
 }
 
 PRESET_IDX=0
