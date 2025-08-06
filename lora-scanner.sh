@@ -3,6 +3,7 @@
 DEVICE=""
 PRESET=()
 INTERVAL=60
+DEBUG=0
 
 usage() {
     echo "Usage: $0 [-D DEVICE] [-p PRESET]... [-i INTERVAL] [-h]"
@@ -10,7 +11,7 @@ usage() {
     echo "Options:"
     echo "  -D DEVICE     Serial Device of lorapipe radio (required)"
     echo "  -p PRESET     LoRA Radio Preset String (one or more required)"
-    echo "  -i INTERVAL   Interval in seconds between switching between the specified presets (default 60)"
+    echo "  -i INTERVAL   Interval in seconds between switching between the specified presets (default 60, minimum 5)"
     echo "  -h            Show this help message and exit"
     exit 1
 }
@@ -27,15 +28,13 @@ while [[ "$#" -gt 0 ]]; do
         -D)
             shift
             [[ -z "$1" || "$1" =~ ^- ]] && error_exit "Missing value for -D"
+            [[ ! -e "$1" ]] && error_exit "Device '$1' does not exist."
             DEVICE="$1"
-            [[ ! -e "$DEVICE" ]] && error_exit "Device '$DEVICE' does not exist."
             ;;
         -i)
             shift
             [[ -z "$1" || "$1" =~ ^- ]] && error_exit "Missing value for -i"
-            if ! [[ "$1" =~ ^[0-9]+$ ]]; then
-                error_exit "Interval must be an integer: got '$1'"
-            fi
+            [[ ! -n "$1" ]] && error_exit "Interval must be an integer: got '$1'"
             INTERVAL="$1"
             ;;
         -p)
@@ -64,7 +63,6 @@ fi
 
 # Do the thing
 exec 3<> "$DEVICE"  # Shove device into a file descriptor
-last_trigger_time=$(date +%s)  # Set start time
 
 change_preset() {
     preset_cmd="set radio $1"
@@ -80,29 +78,52 @@ change_preset() {
     printf "reboot\r\n" >&3
 }
 
-PRESET_IDX=0
+serial_port_loop() {
+    while IFS= read -r -u 3 line; do
+        # timeout after 5s, read fd3 which is a fh on $DEVICE
+        if [[ "$line" == " RAW: "* ]]; then
+            echo "$line"
+        fi
+        [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] $line"
+    done
+}
+
+change_preset ${PRESET[0]} # set initial preset
+preset_idx=1 # initialize preset_idx counter to begin on the second value
+
 run_periodic_command() {  # Run me every interval!
     # only run if more than one preset specififed
     if [[ ${#PRESET[@]} -gt 1 ]]; then
         change_preset ${PRESET[$preset_idx]}
         # Move to the next value in the array, cycling back to the first value if at the end
-        ((arg_index = (arg_index + 1) % ${#REPEATED_ARGS[@]}))
+        ((preset_idx = (preset_idx + 1) % ${#PRESET[@]}))
     fi
 }
 
-change_preset ${PRESET[0]}
+serial_port_loop & # fork a serial port loop
+loop_pid=$! # store the forked processes pid
 
-while IFS= read -r -u 3 line; do
-    if [[ "$line" == RAW* ]]; then
-        echo "$line"
-    fi
+cleanup() {
+    trap - EXIT INT TERM
+    echo "[$0] killing child processes and exiting"
+    kill "$loop_pid" 2>/dev/null
+    exit 0
+}
 
-    # Check time
+trap cleanup EXIT INT TERM # trap exit signals and call cleanup
+
+last_trigger_time=$(date +%s)  # Set start time
+while true; do
     now=$(date +%s)
     elapsed=$((now - last_trigger_time))
+    if [[ "$elapsed" -ge "$INTERVAL" ]]; then
+        kill $loop_pid # kill the reading process
+        wait $loop_pid # wait for it to terminate
 
-    if [[ -n "$INTERVAL" && "$elapsed" -ge "$INTERVAL" ]]; then
         run_periodic_command
         last_trigger_time=$now
+
+        serial_port_loop & # fork a serial port loop
+        loop_pid=$! # store the forked processes pid
     fi
 done
