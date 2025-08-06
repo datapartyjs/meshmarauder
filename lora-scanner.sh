@@ -11,7 +11,7 @@ usage() {
     echo "Options:"
     echo "  -D DEVICE     Serial Device of lorapipe radio (required)"
     echo "  -p PRESET     LoRA Radio Preset String (one or more required)"
-    echo "  -i INTERVAL   Interval in seconds between switching between the specified presets (default 60, minimum 5)"
+    echo "  -i INTERVAL   Interval in seconds between switching between the specified presets (default 60)"
     echo "  -h            Show this help message and exit"
     exit 1
 }
