@@ -3,7 +3,7 @@
 DEVICE=""
 PRESET=()
 INTERVAL=60
-DEBUG=0
+DEBUG=1
 
 usage() {
     echo "Usage: $0 [-D DEVICE] [-p PRESET]... [-i INTERVAL] [-h]"
@@ -64,32 +64,60 @@ fi
 # Do the thing
 exec 3<> "$DEVICE"  # Shove device into a file descriptor
 
-change_preset() {
-    preset_cmd="set radio $1"
-    echo "[$0] sending command: $preset_cmd"
-    printf "$preset_cmd\r\n" >&3
-    IFS= read -r -u 3 line
-    echo "[$0] command recieved: $line"
-    IFS= read -r -t 1 -u 3 line
-    echo "[$0] command response: $line"
-
-    # TODO: fix this in the firmware and remove me
-    echo "[$0] Rebooting to apply radio settings"
-    printf "reboot\r\n" >&3
-}
-
-serial_port_loop() {
-    while IFS= read -r -u 3 line; do
-        # timeout after 5s, read fd3 which is a fh on $DEVICE
-        if [[ "$line" == " RAW: "* ]]; then
-            echo "$line"
+clear_buffer() {
+    while true; do
+        if read -t 0 -u 3; then
+            IFS= read -r -t 1 -u 3 line
+            [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] clear_buffer line: ${line}"
+        else
+            [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] clear_buffer: nothing to read"
+            break
         fi
-        [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] $line"
     done
 }
 
-change_preset ${PRESET[0]} # set initial preset
-preset_idx=1 # initialize preset_idx counter to begin on the second value
+send_cmd() {
+    cmd=$1
+
+    clear_buffer
+
+    printf "$cmd\r\n" >&3
+    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command sent: $cmd"
+
+    IFS= read -r -t 1 -u 3 line
+    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command recieved: $line"
+
+    IFS= read -r -t 1 -u 3 line
+    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command response: $line"
+}
+
+change_preset() {
+    preset_cmd="set radio $1"
+    echo "[$0] [INFO] Setting preset to: ${preset_cmd}"
+    send_cmd "rxlog off"
+    send_cmd "set radio $1"
+    send_cmd "rxlog on"
+}
+
+serial_port_loop() {
+    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] beginning serial port read loop"
+    while IFS= read -r -u 3 line; do
+        # read fd3 which is a fh on $DEVICE
+        if [[ $line =~ ^[0-9]{5}+ ]]; then
+            echo "$line"
+        fi
+        [[ $DEBUG -eq 1 && ! $line =~ ^[0-9]{5}+ ]] && echo "[$0] [DEBUG] $line"
+        [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] waiting for next line"
+    done
+}
+
+preset_idx=0
+init_scanner() {
+    stty -F ${DEVICE} raw
+    stty -F ${DEVICE} -echo
+    change_preset ${PRESET[0]} # set initial preset
+    preset_idx=1 # initialize preset_idx counter to begin on the second value
+}
 
 run_periodic_command() {  # Run me every interval!
     # only run if more than one preset specififed
@@ -100,17 +128,17 @@ run_periodic_command() {  # Run me every interval!
     fi
 }
 
-serial_port_loop & # fork a serial port loop
-loop_pid=$! # store the forked processes pid
-
 cleanup() {
-    trap - EXIT INT TERM
     echo "[$0] killing child processes and exiting"
     kill "$loop_pid" 2>/dev/null
     exit 0
 }
 
-trap cleanup EXIT INT TERM # trap exit signals and call cleanup
+trap cleanup EXIT INT # trap exit signals and call cleanup
+
+init_scanner
+serial_port_loop & # fork a serial port loop
+loop_pid=$! # store the forked processes pid
 
 last_trigger_time=$(date +%s)  # Set start time
 while true; do
