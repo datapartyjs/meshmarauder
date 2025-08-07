@@ -77,10 +77,8 @@ clear_buffer() {
 }
 
 send_cmd() {
-    cmd=$1
-    
     clear_buffer
-
+    cmd=$1
     printf "$cmd\r\n" >&3
     [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command sent: $cmd"
 
