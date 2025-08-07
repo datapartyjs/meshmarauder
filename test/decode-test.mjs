@@ -2,11 +2,14 @@ import * as fs from 'fs'
 import * as readline from 'readline'
 import {fromBinary, toBinary} from '@bufbuild/protobuf'
 import * as protobufs from '@meshtastic/protobufs'
-import { parentTypes } from '@bufbuild/protobuf/reflect'
+
+
+import {tryDecryptPacket} from './utils.mjs'
+import { UINT32_MAX } from '@bufbuild/protobuf/wire'
 
 const PortNumToProtoBuf = {
   0: null, //binary - unknown packet format
-  1: null, // utf-8
+  1: null, // utf-8 - chat message
   2: protobufs.Mesh.NodeRemoteHardwarePinSchema,
   3: protobufs.Mesh.PositionSchema,
   4: protobufs.Mesh.UserSchema,
@@ -23,6 +26,7 @@ const PortNumToProtoBuf = {
         // send and receive telemetry data
 	// type - Protobuf
   67: null, //Telemetry
+  70: null, //traceroute
   73: null  //Map report
 }
 
@@ -30,8 +34,38 @@ const PortNumToProtoBuf = {
 
 let enc_count = 0
 let not_enc_count = 0
+let dec_count = 0
+let dec_fail_count = 0
+let dm_count = 0
 let mqtt = 0
 let not_mqtt = 0
+
+let packet_types = {}
+let users = {}
+
+function base64ToArrayBuffer(base64) {
+    var binaryString = atob(base64);
+    var bytes = new Uint8Array(binaryString.length);
+    for (var i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return new Uint8Array(bytes.buffer);
+}
+
+
+const channels = {
+  Default: new Uint8Array(32),
+  DEFCONnect: base64ToArrayBuffer('OEu8wB3AItGBvza4YSHh+5a3LlW/dCJ+nWr7SNZMsaE='),
+  HackerComms: base64ToArrayBuffer('6IzsaoVhx1ETWeWuu0dUWMLqItvYJLbRzwgTAKCfvtY='),
+  NodeChat: base64ToArrayBuffer('TiIdi8MJG+IRnIkS8iUZXRU+MHuGtuzEasOWXp4QndU=')
+}
+
+channels.Default[31] = 1
+
+console.log(channels)
+
+//process.exit()
+
 
 async function main() {
   const fileName = process.argv[2];
@@ -60,6 +94,7 @@ async function main() {
     let parsedPacket = {}
     let view = new DataView(pkt.buffer)
 
+
     if(pkt.length >= 4){ parsedPacket.addrTo = view.getUint32(0) } else {short=true}
     if(pkt.length >= 8) { parsedPacket.addrFrom = view.getUint32(4) } else {short=true}
     if(pkt.length >= 12) { parsedPacket.pktId = view.getUint32(8) } else {short=true}
@@ -80,6 +115,12 @@ async function main() {
     if(pkt.length >= 14) { parsedPacket.channel = view.getUint8(13) } else {short=true}
     if(pkt.length >= 15) { parsedPacket.next_hop = view.getUint8(14) } else {short=true}
     if(pkt.length >= 16) { parsedPacket.relay_node = view.getUint8(15) } else {short=true}
+
+    
+
+    if(parsedPacket.addrTo != UINT32_MAX){
+      dm_count++
+    }
 
     if(!short){
 
@@ -114,33 +155,72 @@ async function main() {
 
       if(!parsedPacket.encrypted){
 
-          if(parsedPacket.payload.portnum != 0){
-
-            let scheme = PortNumToProtoBuf[ parsedPacket.payload.portnum ]
-
-            if(scheme != null && scheme != undefined){
-
-              parsedPacket.data = fromBinary(scheme, parsedPacket.payload.payload)
-              delete parsedPacket.payload.payload
-
-              if( parsedPacket.data['$typeName'] == 'meshtastic.User' && parsedPacket.data.publicKey.length > 0){
-
-                console.log(parsedPacket)
-              }
-
-            }
 
 
-          }
+      } else {
+
+      let payload = tryDecryptPacket(pkt, channels.DEFCONnect)
+      if(!payload){ payload = tryDecryptPacket(pkt, channels.HackerComms) }
+      if(!payload){ payload = tryDecryptPacket(pkt, channels.NodeChat) }
+      if(!payload){ payload = tryDecryptPacket(pkt, channels.Default) }
+    
+      parsedPacket.payload = payload
+
+      if(payload){
+        dec_count++
+        //console.log(parsedPacket)
+      } else {
+        dec_fail_count++
+      }
+
       }
 
     }
-    console.log(parsedPacket)
+    //console.log(parsedPacket)
+
+    if(parsedPacket.payload){
+      let port = parsedPacket.payload.portnum
+      if(packet_types[port]){
+        packet_types[port]++
+      } else {
+        packet_types[port] = 1
+      }
+    }
+
+    if(parsedPacket.payload && parsedPacket.payload.portnum != 0){
+
+      let scheme = PortNumToProtoBuf[ parsedPacket.payload.portnum ]
+
+      if(scheme != null && scheme != undefined){
+
+        parsedPacket.data = fromBinary(scheme, parsedPacket.payload.payload)
+        delete parsedPacket.payload.payload
+
+        if( parsedPacket.data['$typeName'] == 'meshtastic.User' && parsedPacket.data.publicKey.length > 0){
+
+
+	  if( !users[ parsedPacket.data['id'] ]){
+	  users[ parsedPacket.data['id'] ] = parsedPacket.data['longName']
+
+          console.log(parsedPacket.data['longName'])
+          }
+        }
+
+      }
+    }
+
     
+
   }
 
-  console.log('mqtt:', mqtt, '  not-mqtt:', not_mqtt, ' enc:', enc_count, ' not-enc:', not_enc_count)
+  let stats = {
+    mqtt, not_mqtt, enc_count, not_enc_count, dec_count, dec_fail_count, dm_count, user_count: Object.keys(users).length
+  }
+
+  console.log(packet_types)
+  console.log(stats)
 }
+
 
 main();
 
