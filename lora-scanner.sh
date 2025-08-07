@@ -3,7 +3,7 @@
 DEVICE=""
 PRESET=()
 INTERVAL=60
-DEBUG=1
+DEBUG=0
 
 usage() {
     echo "Usage: $0 [-D DEVICE] [-p PRESET]... [-i INTERVAL] [-h]"
@@ -78,7 +78,7 @@ clear_buffer() {
 
 send_cmd() {
     cmd=$1
-
+    
     clear_buffer
 
     printf "$cmd\r\n" >&3
@@ -100,12 +100,11 @@ change_preset() {
 }
 
 serial_port_loop() {
+    clear_buffer
     [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] beginning serial port read loop"
     while IFS= read -r -u 3 line; do
         # read fd3 which is a fh on $DEVICE
-        if [[ $line =~ ^[0-9]{5}+ ]]; then
-            echo "$line"
-        fi
+        [[ $line =~ ^[0-9]{5}+ ]]; echo "$line"
         [[ $DEBUG -eq 1 && ! $line =~ ^[0-9]{5}+ ]] && echo "[$0] [DEBUG] $line"
         [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] waiting for next line"
     done
