@@ -159,15 +159,17 @@ async function main() {
 
       } else {
 
-      let payload = tryDecryptPacket(pkt, channels.DEFCONnect)
-      if(!payload){ payload = tryDecryptPacket(pkt, channels.HackerComms) }
-      if(!payload){ payload = tryDecryptPacket(pkt, channels.NodeChat) }
-      if(!payload){ payload = tryDecryptPacket(pkt, channels.Default) }
+      let key = null
+      let payload = tryDecryptPacket(pkt, channels.DEFCONnect); key ='DEFCONnect'
+      if(!payload){ payload = tryDecryptPacket(pkt, channels.HackerComms); key='HackerComms'}
+      if(!payload){ payload = tryDecryptPacket(pkt, channels.NodeChat); key='NodeChat' }
+      if(!payload){ payload = tryDecryptPacket(pkt, channels.Default); key='Default' }
     
       parsedPacket.payload = payload
 
       if(payload){
         dec_count++
+        parsedPacket.channel = key
         //console.log(parsedPacket)
       } else {
         dec_fail_count++

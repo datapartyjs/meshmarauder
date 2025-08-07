@@ -6,7 +6,7 @@
     "watch": "nodemon ./test/decode-test.mjs"
   },
   "author": "nullagent",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "description": "",
   "dependencies": {
     "@bufbuild/protobuf": "^2.6.3",
