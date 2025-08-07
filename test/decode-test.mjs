@@ -5,30 +5,28 @@ import * as protobufs from '@meshtastic/protobufs'
 import { parentTypes } from '@bufbuild/protobuf/reflect'
 
 const PortNumToProtoBuf = {
-  0: null,  //ENCODING: binary undefined
-  1: null, //UTF-8 Plaintext (?)
+  0: null, //binary - unknown packet format
+  1: null, // utf-8
   2: protobufs.Mesh.NodeRemoteHardwarePinSchema,
   3: protobufs.Mesh.PositionSchema,
   4: protobufs.Mesh.UserSchema,
   5: protobufs.Mesh.RoutingSchema,
   6: protobufs.Admin.AdminMessageSchema,
-  7: null, //UTF-8 Plaintext (?) with Unishox2 Compression
+  7: null, //Unishox2 Compressed utf-8
   8: protobufs.Mesh.WaypointSchema,
-  9: null, //Encapsulated codec2 packets. On 2.4 GHZ Bandwidths only for now
+  9: null, //codec2 packets
   10: null,
   12: protobufs.Mesh.KeyVerificationSchema,
-  // Provides a 'ping' service that replies to any packet it receives.
-	// Also serves as a small example module.
-	// ENCODING: ASCII Plaintext
+        // 'ping' - replies to all packets.
+	// type - char[]
   32: null, 
-  // Provides a format to send and receive telemetry data from the Meshtastic network.
-	// Maintained by Charles Crossan (crossan007) : crossan007@gmail.com
-	// ENCODING: Protobuf
+        // send and receive telemetry data
+	// type - Protobuf
   67: null, //Telemetry
   73: null  //Map report
 }
 
-// https://meshtastic.org/docs/overview/encryption/
+// https://meshtastic.org/docs/overview/encryption
 
 let enc_count = 0
 let not_enc_count = 0
@@ -45,8 +43,7 @@ async function main() {
     input: fileStream,
     crlfDelay: Infinity
   });
-  // Note: we use the crlfDelay option to recognize all instances of CR LF
-  // ('\r\n') in input.txt as a single line break.
+  // crlfDelay option to clean up CR LF to a one line break
 
   for await (const line of rl) {
     //console.log(`Line from file: ${line}`);
