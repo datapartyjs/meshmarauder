@@ -1,0 +1,19 @@
+{
+  "name": "meshtastic-marauder",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "watch": "nodemon ./test/decode-test.mjs"
+  },
+  "author": "nullagent",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.6.3",
+    "@meshtastic/protobufs": "npm:@jsr/meshtastic__protobufs@^2.7.0",
+    "@noble/ciphers": "^1.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
