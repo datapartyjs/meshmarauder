@@ -91,7 +91,7 @@ send_cmd() {
 
 change_preset() {
     preset_cmd="set radio $1"
-    echo "[$0] [INFO] Setting preset to: ${preset_cmd}"
+    echo "[$0] [INFO] Setting preset to: ${$1}"
     send_cmd "rxlog off"
     send_cmd "set radio $1"
     send_cmd "rxlog on"
