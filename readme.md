@@ -9,7 +9,7 @@ Features
  - packet decoding
    * protocol header
    * unencrypted packets
-   * encrypted asymmetric channel messages (coming soon)
+   * encrypted asymmetric channel messages
    * encrypted symmetric messages (coming soon)
  - PKI poisoning (coming soon)
  - public channel impersonation (coming soon)
