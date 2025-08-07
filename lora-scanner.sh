@@ -90,7 +90,8 @@ send_cmd() {
 }
 
 change_preset() {
-    echo "[$0] [INFO] Setting preset to: $1"
+    timestamp=$(date +%s)
+    echo "$timestamp RADIO_PRESET: $1"
     send_cmd "rxlog off"
     send_cmd "set radio $1"
     send_cmd "rxlog on"
