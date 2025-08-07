@@ -34,7 +34,7 @@ let mqtt = 0
 let not_mqtt = 0
 
 async function main() {
-  const fileName = '/home/null/data/defcon-msg1.txt';
+  const fileName = process.argv[2];
 
 
   const fileStream = fs.createReadStream(fileName)

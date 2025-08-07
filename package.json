@@ -3,11 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "watch": "nodemon ./decode-test.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "watch": "nodemon ./test/decode-test.mjs"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "nullagent",
+  "license": "MIT",
   "description": "",
   "dependencies": {
     "@bufbuild/protobuf": "^2.6.3",
