@@ -22,6 +22,10 @@ error_exit() {
     exit 1
 }
 
+debug_echo() {
+    echo "[$0] [DEBUG] $1" >&2
+}
+
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -68,9 +72,9 @@ clear_buffer() {
     while true; do
         if read -t 0 -u 3; then
             IFS= read -r -t 1 -u 3 line
-            [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] clear_buffer line: ${line}"
+            [[ $DEBUG -eq 1 ]] && debug_echo "clear_buffer line: ${line}"
         else
-            [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] clear_buffer: nothing to read"
+            [[ $DEBUG -eq 1 ]] && debug_echo "clear_buffer: nothing to read"
             break
         fi
     done
@@ -80,15 +84,15 @@ send_cmd() {
     clear_buffer
     cmd=$1
     printf "$cmd\r\n" >&3
-    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command sent: $cmd"
+    [[ $DEBUG -eq 1 ]] && debug_echo "command sent: $cmd"
 
     IFS= read -r -t 1 -u 3 line
-    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command recieved: $line"
+    [[ $DEBUG -eq 1 ]] && debug_echo "command received: $line"
 
     IFS= read -r -t 1 -u 3 line
-    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command response: $line"
+    [[ $DEBUG -eq 1 ]] && debug_echo "command response: $line"
 
-    return $line
+    echo $line
 }
 
 change_preset() {
@@ -109,12 +113,12 @@ set_clock() {
 
 serial_port_loop() {
     clear_buffer
-    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] beginning serial port read loop"
+    [[ $DEBUG -eq 1 ]] && debug_echo "beginning serial port read loop"
     while IFS= read -r -u 3 line; do
         # read fd3 which is a fh on $DEVICE
         [[ $line =~ ^[0-9]{5}+ ]]; echo "$line"
-        [[ $DEBUG -eq 1 && ! $line =~ ^[0-9]{5}+ ]] && echo "[$0] [DEBUG] $line"
-        [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] waiting for next line"
+        [[ $DEBUG -eq 1 && ! $line =~ ^[0-9]{5}+ ]] && debug_echo "[SERIAL] $line"
+        [[ $DEBUG -eq 1 ]] && debug_echo "waiting for next line"
     done
 }
 
