@@ -100,7 +100,7 @@ rxlog() {
         resp=$(send_cmd "rxlog off")
         [[ "$resp" == "-> rxlog off" ]] && return 0 || return 1
     else
-        send_cmd "rxlog on"
+        resp=$(send_cmd "rxlog on")
         [[ "$resp" == "-> rxlog on" ]] && return 0 || return 1
     fi
 }
