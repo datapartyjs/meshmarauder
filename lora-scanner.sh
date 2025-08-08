@@ -116,8 +116,13 @@ change_preset() {
     [[ ! "$resp" == "-> OK" ]] && error_echo "$resp"
 
     timestamp=$(date +%s)
-    radio_preset=$(send_cmd "get radio")
-    echo "$timestamp,RADIO_PRESET,$radio_preset"
+    resp=$(send_cmd "get radio")
+    if [[ "$resp" =~ "->.+([0-9a-fA-Fx,\.]+)" ]]; then
+        radio_preset=${BASH_REMATCH[1]}
+        echo "$timestamp,RADIO_PRESET,$radio_preset"
+    else
+        echo "$timestamp,RADIO_PRESET,UNKNOWN RESPONSE,$resp"
+    fi
 
     rxlog true
 }
