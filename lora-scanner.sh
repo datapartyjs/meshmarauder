@@ -98,6 +98,7 @@ send_cmd() {
     [[ $DEBUG -eq 1 ]] && debug_echo "command response: $z"
 
     echo $(echo $line | tr -d '\r')
+}
 
 rxlog() {
     if [ $1 = true ]; then
