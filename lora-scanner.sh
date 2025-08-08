@@ -95,7 +95,7 @@ send_cmd() {
     [[ $DEBUG -eq 1 ]] && debug_echo "command received: $line"
 
     IFS= read -r -t 1 -u 3 line
-    [[ $DEBUG -eq 1 ]] && debug_echo "command response: $z"
+    [[ $DEBUG -eq 1 ]] && debug_echo "command response: $line"
 
     echo $(echo $line | tr -d '\r')
 }
