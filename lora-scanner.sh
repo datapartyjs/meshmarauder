@@ -113,7 +113,7 @@ rxlog() {
 change_preset() {
     rxlog false
     resp=$(send_cmd "set radio $1")
-    [[ !! "$resp" == "-> OK" ]] && error_echo "$resp"
+    [[ ! "$resp" == "-> OK" ]] && error_echo "$resp"
 
     timestamp=$(date +%s)
     radio_preset=$(send_cmd "get radio")
