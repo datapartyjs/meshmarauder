@@ -152,6 +152,20 @@ set_clock() {
     fi
 }
 
+get_clock() {
+    imestamp=$(date +%s)
+    resp=$(send_cmd "clock")
+    regex='^-> (.+)$'
+    if [[ "$resp" =~ $regex ]]; then
+        clock_time=${BASH_REMATCH[1]}
+        echo "$timestamp,GET_CLOCK,$clock_time"
+        return 0
+    else
+        error_echo "$resp"
+        return 1
+    fi
+}
+
 serial_port_loop() {
     clear_buffer
     [[ $DEBUG -eq 1 ]] && debug_echo "beginning serial port read loop"
@@ -170,6 +184,7 @@ init_scanner() {
     stty -F ${DEVICE} -echo
     rxlog false # will be re-enabled initially in change_preset
     set_clock
+    get_clock
     change_preset ${PRESET[0]} # set initial preset
     preset_idx=1 # initialize preset_idx counter to begin on the second value
 }
