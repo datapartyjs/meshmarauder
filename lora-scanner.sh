@@ -97,6 +97,11 @@ change_preset() {
     send_cmd "rxlog on"
 }
 
+set_clock() {
+    timestamp=$(date +%s)
+    send_cmd "clock sync $timestamp"
+}
+
 serial_port_loop() {
     clear_buffer
     [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] beginning serial port read loop"
