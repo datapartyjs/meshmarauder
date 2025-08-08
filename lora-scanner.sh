@@ -117,7 +117,8 @@ change_preset() {
 
     timestamp=$(date +%s)
     resp=$(send_cmd "get radio")
-    if [[ "$resp" =~ "->.+([0-9a-fA-Fx,\.]+)" ]]; then
+    regex='[-> ]+([0-9a-fA-Fx,.]+)'
+    if [[ "$resp" =~ $regex ]]; then
         radio_preset=${BASH_REMATCH[1]}
         echo "$timestamp,RADIO_PRESET,$radio_preset"
     else
