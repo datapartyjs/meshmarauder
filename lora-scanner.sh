@@ -87,13 +87,18 @@ send_cmd() {
 
     IFS= read -r -t 1 -u 3 line
     [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command response: $line"
+
+    return $line
 }
 
 change_preset() {
-    timestamp=$(date +%s)
-    echo "$timestamp RADIO_PRESET: $1"
     send_cmd "rxlog off"
     send_cmd "set radio $1"
+
+    timestamp=$(date +%s)
+    radio_preset=$(send_cmd "get radio")
+    echo "$timestamp,RADIO_PRESET,$radio_preset"
+
     send_cmd "rxlog on"
 }
 
