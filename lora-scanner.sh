@@ -140,8 +140,8 @@ change_preset() {
 
 set_clock() {
     timestamp=$(date +%s)
-    resp=$(send_cmd "clock sync $timestamp")
-    if [[ "$resp" == OK$ ]]; then
+    resp=$(send_cmd "time $timestamp")
+    if [[ "$resp" == ^OK ]]; then
         return 0
     else
         error_echo "$resp"
