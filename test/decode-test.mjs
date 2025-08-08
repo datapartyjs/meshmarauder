@@ -7,6 +7,7 @@ import * as protobufs from '@meshtastic/protobufs'
 import {tryDecryptChannelPacket, parseInputPacket} from './utils.mjs'
 import { UINT32_MAX } from '@bufbuild/protobuf/wire'
 
+
 const PortNumToProtoBuf = {
   0: null, //binary - unknown packet format
   1: null, // utf-8 - chat message
@@ -66,9 +67,7 @@ const channels = {
 
 channels.Default[31] = 1
 
-//console.log(channels)
 
-//process.exit()
 
 
 async function main() {

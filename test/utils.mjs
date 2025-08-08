@@ -46,6 +46,10 @@ export function parseInputPacket(line){
 
 }
 
+export function tryDecodeMeshPacket(pipePacket){
+  
+}
+
 /**
  * 
  * @param {Uint8Array} pkt 
