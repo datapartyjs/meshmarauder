@@ -107,7 +107,12 @@ rxlog() {
         [[ "$resp" == "-> rxlog on" ]] && return 0 || return 1
     else
         resp=$(send_cmd "rxlog off")
-        [[ "$resp" == "-> rxlog off" ]] && return 0 || return 1
+        if [[ "$resp" == "-> rxlog off" ]]; then 
+            return 0
+        else
+            clear_buffer
+            return 1
+        fi
     fi
 }
 
