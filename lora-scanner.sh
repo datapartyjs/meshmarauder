@@ -97,9 +97,11 @@ send_cmd() {
 
 rxlog() {
     if [ $1 = true ]; then
-        send_cmd "rxlog off"
+        resp=$(send_cmd "rxlog off")
+        [[ $resp -eq "-> rxlog off" ]] && return 0 || return 1
     else
         send_cmd "rxlog on"
+        [[ $resp -eq "-> rxlog on" ]] && return 0 || return 1
     fi
 }
 
