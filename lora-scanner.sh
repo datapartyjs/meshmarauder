@@ -144,7 +144,7 @@ set_clock() {
     regex='^-> OK - (.+)$'
     if [[ "$resp" =~ $regex ]]; then
         clock_time=${BASH_REMATCH[1]}
-        echo "$timestamp,RTC_TIME,$clock_time"
+        echo "$timestamp,SET_CLOCK,$clock_time"
         return 0
     else
         error_echo "$resp"
