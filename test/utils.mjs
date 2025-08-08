@@ -30,16 +30,21 @@ export function parseInputPacket(line){
 
       //new csv format
 
-      let [timestamp, rssi, snr, hex] = lineCleaned.split(',')
+      let [timestamp, type, ...content] = lineCleaned.split(',')
 
-      packet.seen = timestamp
-      packet.rssi = parseFloat(rssi)
-      packet.snr = parseFloat(snr)
-      packet.raw = Uint8Array.from(Buffer.from(hex, 'hex'))
+      if(type == 'RXLOG'){
+        let [rssi, snr, hex] = content
+        
+        packet.seen = timestamp
+        packet.rssi = parseFloat(rssi)
+        packet.snr = parseFloat(snr)
+        packet.raw = Uint8Array.from(Buffer.from(hex, 'hex'))
+        
+        return packet
+      }
 
     }
 
-    return packet
   } catch (err){
     return null;
   }
@@ -47,7 +52,7 @@ export function parseInputPacket(line){
 }
 
 export function tryDecodeMeshPacket(pipePacket){
-  
+
 }
 
 /**
