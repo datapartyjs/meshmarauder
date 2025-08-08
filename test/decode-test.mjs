@@ -55,6 +55,10 @@ function base64ToArrayBuffer(base64) {
 
 const channels = {
   Default: new Uint8Array(32),
+  Default2: new Uint8Array([
+    0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
+    0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01
+  ]),
   DEFCONnect: base64ToArrayBuffer('OEu8wB3AItGBvza4YSHh+5a3LlW/dCJ+nWr7SNZMsaE='),
   HackerComms: base64ToArrayBuffer('6IzsaoVhx1ETWeWuu0dUWMLqItvYJLbRzwgTAKCfvtY='),
   NodeChat: base64ToArrayBuffer('TiIdi8MJG+IRnIkS8iUZXRU+MHuGtuzEasOWXp4QndU=')
@@ -164,6 +168,7 @@ async function main() {
       if(!payload){ payload = tryDecryptPacket(pkt, channels.HackerComms); key='HackerComms'}
       if(!payload){ payload = tryDecryptPacket(pkt, channels.NodeChat); key='NodeChat' }
       if(!payload){ payload = tryDecryptPacket(pkt, channels.Default); key='Default' }
+      if(!payload){ payload = tryDecryptPacket(pkt, channels.Default2); key='Default2' }
     
       parsedPacket.payload = payload
 
@@ -201,15 +206,18 @@ async function main() {
         if( parsedPacket.data['$typeName'] == 'meshtastic.User' && parsedPacket.data.publicKey.length > 0){
 
 
+
 	  if( !users[ parsedPacket.data['id'] ]){
 	  users[ parsedPacket.data['id'] ] = parsedPacket.data['longName']
 
-          console.log(parsedPacket.data['longName'])
-          }
+  }
+  
         }
 
       }
     }
+
+    //console.log(parsedPacket.data)
 
     
 
