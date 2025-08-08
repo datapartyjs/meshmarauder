@@ -22,6 +22,10 @@ error_exit() {
     exit 1
 }
 
+error_echo() {
+    echo "[$0] [ERROR] $1" >&2
+}
+
 debug_echo() {
     echo "[$0] [DEBUG] $1" >&2
 }
@@ -68,6 +72,7 @@ fi
 # Do the thing
 exec 3<> "$DEVICE"  # Shove device into a file descriptor
 
+# Utility methods
 clear_buffer() {
     while true; do
         if read -t 0 -u 3; then
@@ -90,7 +95,7 @@ send_cmd() {
     [[ $DEBUG -eq 1 ]] && debug_echo "command received: $line"
 
     IFS= read -r -t 1 -u 3 line
-    [[ $DEBUG -eq 1 ]] && debug_echo "command response: $line"
+    [[ $DEBUG -eq 1 ]] && debug_echo "command response: $z"
 
     echo $line
 }
@@ -107,7 +112,8 @@ rxlog() {
 
 change_preset() {
     rxlog false
-    send_cmd "set radio $1"
+    resp=$(send_cmd "set radio $1")
+    [[ !! "$resp" == "-> OK" ]] && error_echo "$resp"
 
     timestamp=$(date +%s)
     radio_preset=$(send_cmd "get radio")
@@ -118,7 +124,13 @@ change_preset() {
 
 set_clock() {
     timestamp=$(date +%s)
-    send_cmd "clock sync $timestamp"
+    resp=$(send_cmd "clock sync $timestamp")
+    if [[ "$resp" == "-> OK" ]]; then
+        return 0
+    else
+        error_echo "$resp"
+        return 1
+    fi
 }
 
 serial_port_loop() {
