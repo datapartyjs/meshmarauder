@@ -141,7 +141,10 @@ change_preset() {
 set_clock() {
     timestamp=$(date +%s)
     resp=$(send_cmd "time $timestamp")
-    if [[ "$resp" == ^OK ]]; then
+    regex='^-> OK - (.+)$'
+    if [[ "$resp" =~ $regex ]]; then
+        clock_time=${BASH_REMATCH[1]}
+        echo "$timestamp,RTC_TIME,$clock_time"
         return 0
     else
         error_echo "$resp"
