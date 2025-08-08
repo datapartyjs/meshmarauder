@@ -11,7 +11,8 @@ usage() {
     echo "Options:"
     echo "  -D DEVICE     Serial Device of lorapipe radio (required)"
     echo "  -p PRESET     LoRA Radio Preset String (one or more required)"
-    echo "  -i INTERVAL   Interval in seconds between switching between the specified presets (default 60)"
+    echo "  -i INTERVAL   Interval in seconds between switching between the " \
+         "specified presets (default 60)"
     echo "  -h            Show this help message and exit"
     exit 1
 }
@@ -116,11 +117,13 @@ change_preset() {
     [[ ! "$resp" =~ OK$ ]] && error_echo "$resp"
 
     timestamp=$(date +%s)
-    resp=$(send_cmd "get radio")
+    radio_resp=$(send_cmd "get radio")
     rxlog true
 
-    regex='([0-9a-fA-Fx,.]+)$'
-    if [[ "$resp" =~ $regex ]]; then
+    # loosely matches something that looks like this at the end of the line
+    # 906.875,250.0,11,5,0xb2
+    regex='([0-9.]+,[0-9.]+,[0-9]+,[0-9]+,0x[0-9a-fA-F]{2})$'
+    if [[ "$radio_resp" =~ $regex ]]; then
         radio_preset=${BASH_REMATCH[1]}
         echo "$timestamp,RADIO_PRESET,$radio_preset"
         return 0
@@ -147,7 +150,8 @@ serial_port_loop() {
     while IFS= read -r -u 3 line; do
         # read fd3 which is a fh on $DEVICE
         [[ $line =~ ^[0-9]{5}+ ]]; echo "$line"
-        [[ $DEBUG -eq 1 && ! $line =~ ^[0-9]{5}+ ]] && debug_echo "[SERIAL] $line"
+        [[ $DEBUG -eq 1 && ! $line =~ ^[0-9]{5}+ ]] && \
+            debug_echo "[SERIAL] $line"
         [[ $DEBUG -eq 1 ]] && debug_echo "waiting for next line"
     done
 }
@@ -166,7 +170,8 @@ run_periodic_command() {  # Run me every interval!
     # only run if more than one preset specififed
     if [[ ${#PRESET[@]} -gt 1 ]]; then
         change_preset ${PRESET[$preset_idx]}
-        # Move to the next value in the array, cycling back to the first value if at the end
+        # Move to the next value in the array, cycling back to the
+        # first value if at the end
         ((preset_idx = (preset_idx + 1) % ${#PRESET[@]}))
     fi
 }
