@@ -4,7 +4,7 @@ import {fromBinary, toBinary} from '@bufbuild/protobuf'
 import * as protobufs from '@meshtastic/protobufs'
 
 
-import {tryDecryptPacket} from './utils.mjs'
+import {tryDecryptChannelPacket, parseInputPacket} from './utils.mjs'
 import { UINT32_MAX } from '@bufbuild/protobuf/wire'
 
 const PortNumToProtoBuf = {
@@ -20,10 +20,10 @@ const PortNumToProtoBuf = {
   9: null, //codec2 packets
   10: null,
   12: protobufs.Mesh.KeyVerificationSchema,
-        // 'ping' - replies to all packets.
+  // 'ping' - replies to all packets.
 	// type - char[]
   32: null, 
-        // send and receive telemetry data
+  // send and receive telemetry data
 	// type - Protobuf
   67: null, //Telemetry
   70: null, //traceroute
@@ -55,6 +55,10 @@ function base64ToArrayBuffer(base64) {
 
 const channels = {
   Default: new Uint8Array(32),
+  Default2: new Uint8Array([
+    0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
+    0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01
+  ]),
   DEFCONnect: base64ToArrayBuffer('OEu8wB3AItGBvza4YSHh+5a3LlW/dCJ+nWr7SNZMsaE='),
   HackerComms: base64ToArrayBuffer('6IzsaoVhx1ETWeWuu0dUWMLqItvYJLbRzwgTAKCfvtY='),
   NodeChat: base64ToArrayBuffer('TiIdi8MJG+IRnIkS8iUZXRU+MHuGtuzEasOWXp4QndU=')
@@ -62,7 +66,7 @@ const channels = {
 
 channels.Default[31] = 1
 
-console.log(channels)
+//console.log(channels)
 
 //process.exit()
 
@@ -82,8 +86,16 @@ async function main() {
   for await (const line of rl) {
     //console.log(`Line from file: ${line}`);
 
-    let lineCleaned = line.trim().replace('RAW: ', '')
-    const pkt = Uint8Array.from(Buffer.from(lineCleaned, 'hex'))
+    //let lineCleaned = line.trim().replace('RAW: ', '')
+    //const pkt = Uint8Array.from(Buffer.from(lineCleaned, 'hex'))
+
+    const loraPipePacket = parseInputPacket(line)
+
+    if(loraPipePacket == null){
+      continue
+    }
+
+    const pkt = loraPipePacket.raw
 
     if(pkt.length == 0) {
       continue;
@@ -91,7 +103,11 @@ async function main() {
 
 
     let short = false
-    let parsedPacket = {}
+    let parsedPacket = {
+      seen: loraPipePacket.seen,
+      rssi: loraPipePacket.rssi,
+      snr: loraPipePacket.snr
+    }
     let view = new DataView(pkt.buffer)
 
 
@@ -120,6 +136,9 @@ async function main() {
 
     if(parsedPacket.addrTo != UINT32_MAX){
       dm_count++
+      parsedPacket.is_dm = true
+    } else {
+      parsedPacket.is_broadcast = true
     }
 
     if(!short){
@@ -132,19 +151,7 @@ async function main() {
 
         //process.exit()
       } catch (err){
-        //encrypted
-
-        /* PKI decrypt, loops over user keys
-
-         if (crypto->decryptCurve25519(
-         p->from,
-         nodeDB->getMeshNode(p->from)->user.public_key,
-         p->id,
-         rawSize,
-         p->encrypted.bytes,
-         bytes)) {*/
-
-        //         
+        //encrypted 
 
         parsedPacket.encrypted = true
         enc_count++
@@ -159,26 +166,27 @@ async function main() {
 
       } else {
 
-      let key = null
-      let payload = tryDecryptPacket(pkt, channels.DEFCONnect); key ='DEFCONnect'
-      if(!payload){ payload = tryDecryptPacket(pkt, channels.HackerComms); key='HackerComms'}
-      if(!payload){ payload = tryDecryptPacket(pkt, channels.NodeChat); key='NodeChat' }
-      if(!payload){ payload = tryDecryptPacket(pkt, channels.Default); key='Default' }
-    
-      parsedPacket.payload = payload
+        let key = null
+        let payload = tryDecryptChannelPacket(pkt, channels.DEFCONnect); key ='DEFCONnect'
+        if(!payload){ payload = tryDecryptChannelPacket(pkt, channels.HackerComms); key='HackerComms'}
+        if(!payload){ payload = tryDecryptChannelPacket(pkt, channels.NodeChat); key='NodeChat' }
+        if(!payload){ payload = tryDecryptChannelPacket(pkt, channels.Default); key='Default' }
+        if(!payload){ payload = tryDecryptChannelPacket(pkt, channels.Default2); key='Default2' }
+      
+        parsedPacket.payload = payload
 
-      if(payload){
-        dec_count++
-        parsedPacket.channel = key
-        //console.log(parsedPacket)
-      } else {
-        dec_fail_count++
-      }
+        if(payload){
+          dec_count++
+          parsedPacket.channel = key
+          //console.log(parsedPacket)
+        } else {
+          dec_fail_count++
+        }
 
       }
 
     }
-    //console.log(parsedPacket)
+
 
     if(parsedPacket.payload){
       let port = parsedPacket.payload.portnum
@@ -200,16 +208,18 @@ async function main() {
 
         if( parsedPacket.data['$typeName'] == 'meshtastic.User' && parsedPacket.data.publicKey.length > 0){
 
+          if( !users[ parsedPacket.data['id'] ]){
+            users[ parsedPacket.data['id'] ] = parsedPacket.data['longName']
 
-	  if( !users[ parsedPacket.data['id'] ]){
-	  users[ parsedPacket.data['id'] ] = parsedPacket.data['longName']
-
-          console.log(parsedPacket.data['longName'])
           }
+  
         }
 
       }
     }
+
+    //console.log(JSON.stringify(parsedPacket,null))
+    console.log(parsedPacket)
 
     
 
@@ -219,8 +229,8 @@ async function main() {
     mqtt, not_mqtt, enc_count, not_enc_count, dec_count, dec_fail_count, dm_count, user_count: Object.keys(users).length
   }
 
-  console.log(packet_types)
-  console.log(stats)
+  //console.log(packet_types)
+  //console.log(stats)
 }
 
 
