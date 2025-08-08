@@ -97,8 +97,7 @@ send_cmd() {
     IFS= read -r -t 1 -u 3 line
     [[ $DEBUG -eq 1 ]] && debug_echo "command response: $z"
 
-    echo $line
-}
+    echo $(echo $line | tr -d '\r')
 
 rxlog() {
     if [ $1 = true ]; then
@@ -117,21 +116,23 @@ change_preset() {
 
     timestamp=$(date +%s)
     resp=$(send_cmd "get radio")
-    regex='[-> ]+([0-9a-fA-Fx,.]+)'
+    rxlog true
+
+    regex='([0-9a-fA-Fx,.]+)$'
     if [[ "$resp" =~ $regex ]]; then
         radio_preset=${BASH_REMATCH[1]}
         echo "$timestamp,RADIO_PRESET,$radio_preset"
+        return 0
     else
         echo "$timestamp,RADIO_PRESET,UNKNOWN RESPONSE,$resp"
+        return 1
     fi
-
-    rxlog true
 }
 
 set_clock() {
     timestamp=$(date +%s)
     resp=$(send_cmd "clock sync $timestamp")
-    if [[ "$resp" == "-> OK" ]]; then
+    if [[ "$resp" == OK$ ]]; then
         return 0
     else
         error_echo "$resp"
