@@ -117,6 +117,7 @@ preset_idx=0
 init_scanner() {
     stty -F ${DEVICE} raw
     stty -F ${DEVICE} -echo
+    set_clock
     change_preset ${PRESET[0]} # set initial preset
     preset_idx=1 # initialize preset_idx counter to begin on the second value
 }
