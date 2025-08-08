@@ -4,7 +4,7 @@ import {fromBinary, toBinary} from '@bufbuild/protobuf'
 import * as protobufs from '@meshtastic/protobufs'
 
 
-import {tryDecryptChannelPacket} from './utils.mjs'
+import {tryDecryptChannelPacket, parseInputPacket} from './utils.mjs'
 import { UINT32_MAX } from '@bufbuild/protobuf/wire'
 
 const PortNumToProtoBuf = {
@@ -86,8 +86,16 @@ async function main() {
   for await (const line of rl) {
     //console.log(`Line from file: ${line}`);
 
-    let lineCleaned = line.trim().replace('RAW: ', '')
-    const pkt = Uint8Array.from(Buffer.from(lineCleaned, 'hex'))
+    //let lineCleaned = line.trim().replace('RAW: ', '')
+    //const pkt = Uint8Array.from(Buffer.from(lineCleaned, 'hex'))
+
+    const loraPipePacket = parseInputPacket(line)
+
+    if(loraPipePacket == null){
+      continue
+    }
+
+    const pkt = loraPipePacket.raw
 
     if(pkt.length == 0) {
       continue;
@@ -95,7 +103,11 @@ async function main() {
 
 
     let short = false
-    let parsedPacket = {}
+    let parsedPacket = {
+      seen: loraPipePacket.seen,
+      rssi: loraPipePacket.rssi,
+      snr: loraPipePacket.snr
+    }
     let view = new DataView(pkt.buffer)
 
 
