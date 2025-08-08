@@ -95,15 +95,23 @@ send_cmd() {
     echo $line
 }
 
+rxlog() {
+    if [ $1 = true ]; then
+        send_cmd "rxlog off"
+    else
+        send_cmd "rxlog on"
+    fi
+}
+
 change_preset() {
-    send_cmd "rxlog off"
+    rxlog false
     send_cmd "set radio $1"
 
     timestamp=$(date +%s)
     radio_preset=$(send_cmd "get radio")
     echo "$timestamp,RADIO_PRESET,$radio_preset"
 
-    send_cmd "rxlog on"
+    rxlog true
 }
 
 set_clock() {
@@ -126,6 +134,7 @@ preset_idx=0
 init_scanner() {
     stty -F ${DEVICE} raw
     stty -F ${DEVICE} -echo
+    rxlog false # will be re-enabled initially in change_preset
     set_clock
     change_preset ${PRESET[0]} # set initial preset
     preset_idx=1 # initialize preset_idx counter to begin on the second value
