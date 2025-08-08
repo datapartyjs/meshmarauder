@@ -11,7 +11,8 @@ usage() {
     echo "Options:"
     echo "  -D DEVICE     Serial Device of lorapipe radio (required)"
     echo "  -p PRESET     LoRA Radio Preset String (one or more required)"
-    echo "  -i INTERVAL   Interval in seconds between switching between the specified presets (default 60)"
+    echo "  -i INTERVAL   Interval in seconds between switching between the " \
+         "specified presets (default 60)"
     echo "  -h            Show this help message and exit"
     exit 1
 }
@@ -20,6 +21,14 @@ error_exit() {
     echo "Error: $1" >&2
     usage
     exit 1
+}
+
+error_echo() {
+    echo "[$0] [ERROR] $1" >&2
+}
+
+debug_echo() {
+    echo "[$0] [DEBUG] $1" >&2
 }
 
 # Parse arguments
@@ -64,13 +73,14 @@ fi
 # Do the thing
 exec 3<> "$DEVICE"  # Shove device into a file descriptor
 
+# Utility methods
 clear_buffer() {
     while true; do
         if read -t 0 -u 3; then
             IFS= read -r -t 1 -u 3 line
-            [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] clear_buffer line: ${line}"
+            [[ $DEBUG -eq 1 ]] && debug_echo "clear_buffer line: ${line}"
         else
-            [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] clear_buffer: nothing to read"
+            [[ $DEBUG -eq 1 ]] && debug_echo "clear_buffer: nothing to read"
             break
         fi
     done
@@ -80,36 +90,91 @@ send_cmd() {
     clear_buffer
     cmd=$1
     printf "$cmd\r\n" >&3
-    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command sent: $cmd"
+    [[ $DEBUG -eq 1 ]] && debug_echo "command sent: $cmd"
 
     IFS= read -r -t 1 -u 3 line
-    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command recieved: $line"
+    [[ $DEBUG -eq 1 ]] && debug_echo "command received: $line"
 
     IFS= read -r -t 1 -u 3 line
-    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] command response: $line"
+    [[ $DEBUG -eq 1 ]] && debug_echo "command response: $line"
+
+    echo $(echo $line | tr -d '\r')
+}
+
+rxlog() {
+    if [ $1 = true ]; then
+        resp=$(send_cmd "rxlog on")
+        [[ "$resp" == "-> rxlog on" ]] && return 0 || return 1
+    else
+        resp=$(send_cmd "rxlog off")
+        if [[ "$resp" == "-> rxlog off" ]]; then 
+            return 0
+        else
+            clear_buffer
+            return 1
+        fi
+    fi
 }
 
 change_preset() {
+    rxlog false
+    resp=$(send_cmd "set radio $1")
+    [[ ! "$resp" =~ OK$ ]] && error_echo "$resp"
+
     timestamp=$(date +%s)
-    echo "$timestamp RADIO_PRESET: $1"
-    send_cmd "rxlog off"
-    send_cmd "set radio $1"
-    send_cmd "rxlog on"
+    radio_resp=$(send_cmd "get radio")
+    rxlog true
+
+    # loosely matches something that looks like this at the end of the line
+    # 906.875,250.0,11,5,0xb2
+    regex='([0-9.]+,[0-9.]+,[0-9]+,[0-9]+,0x[0-9a-fA-F]{2})$'
+    if [[ "$radio_resp" =~ $regex ]]; then
+        radio_preset=${BASH_REMATCH[1]}
+        echo "$timestamp,RADIO_PRESET,$radio_preset"
+        return 0
+    else
+        echo "$timestamp,RADIO_PRESET,UNKNOWN RESPONSE,$resp"
+        return 1
+    fi
 }
 
 set_clock() {
     timestamp=$(date +%s)
-    send_cmd "clock sync $timestamp"
+    resp=$(send_cmd "time $timestamp")
+    regex='^-> OK - (.+)$'
+    if [[ "$resp" =~ $regex ]]; then
+        clock_time=${BASH_REMATCH[1]}
+        echo "$timestamp,SET_CLOCK,$clock_time"
+        return 0
+    else
+        error_echo "$resp"
+        return 1
+    fi
+}
+
+get_clock() {
+    imestamp=$(date +%s)
+    resp=$(send_cmd "clock")
+    regex='^-> (.+)$'
+    if [[ "$resp" =~ $regex ]]; then
+        clock_time=${BASH_REMATCH[1]}
+        echo "$timestamp,GET_CLOCK,$clock_time"
+        return 0
+    else
+        error_echo "$resp"
+        return 1
+    fi
 }
 
 serial_port_loop() {
     clear_buffer
-    [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] beginning serial port read loop"
+    [[ $DEBUG -eq 1 ]] && debug_echo "beginning serial port read loop"
     while IFS= read -r -u 3 line; do
         # read fd3 which is a fh on $DEVICE
         [[ $line =~ ^[0-9]{5}+ ]]; echo "$line"
-        [[ $DEBUG -eq 1 && ! $line =~ ^[0-9]{5}+ ]] && echo "[$0] [DEBUG] $line"
-        [[ $DEBUG -eq 1 ]] && echo "[$0] [DEBUG] waiting for next line"
+        [[ $DEBUG -eq 1 && ! $line =~ ^[0-9]{5}+ ]] && \
+            debug_echo "[SERIAL] $line"
+        [[ $DEBUG -eq 1 ]] && debug_echo "waiting for next line"
     done
 }
 
@@ -117,7 +182,9 @@ preset_idx=0
 init_scanner() {
     stty -F ${DEVICE} raw
     stty -F ${DEVICE} -echo
+    rxlog false # will be re-enabled initially in change_preset
     set_clock
+    get_clock
     change_preset ${PRESET[0]} # set initial preset
     preset_idx=1 # initialize preset_idx counter to begin on the second value
 }
@@ -126,7 +193,8 @@ run_periodic_command() {  # Run me every interval!
     # only run if more than one preset specififed
     if [[ ${#PRESET[@]} -gt 1 ]]; then
         change_preset ${PRESET[$preset_idx]}
-        # Move to the next value in the array, cycling back to the first value if at the end
+        # Move to the next value in the array, cycling back to the
+        # first value if at the end
         ((preset_idx = (preset_idx + 1) % ${#PRESET[@]}))
     fi
 }
