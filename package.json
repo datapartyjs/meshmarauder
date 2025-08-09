@@ -4,7 +4,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "watch": "nodemon ./test/decode-test.mjs"
+    "watch": "nodemon ./test/decode-test.mjs",
+    "forever": "forever start ./bin/pki-poison ~/bigblob.txt /dev/tty_lorapipe0"
   },
   "author": "nullagent",
   "license": "GPL-3.0",
