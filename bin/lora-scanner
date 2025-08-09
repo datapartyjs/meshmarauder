@@ -215,6 +215,18 @@ last_trigger_time=$(date +%s)  # Set start time
 while true; do
     now=$(date +%s)
     elapsed=$((now - last_trigger_time))
+    if read -t 0; then # non-blocking check for anything to read on our stdin
+        while IFS= read -r line; do
+            regex='^txraw [0-9a-fA-F]+$'
+            if [[ "$line" =~ $regex ]]; then
+                kill -STOP $loop_pid # halt the main read loop
+                timestamp=$(date +%s)
+                resp=$(send_cmd "$line") # send line as raw command, get reply
+                echo "$timestamp,TXRAW,$resp" # show the reply in our stdout
+                kill -CONT $loop_pid # continue the main read loop
+            fi
+        done
+    fi
     if [[ "$elapsed" -ge "$INTERVAL" ]]; then
         kill $loop_pid # kill the reading process
         wait $loop_pid # wait for it to terminate
