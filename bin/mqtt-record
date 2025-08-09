@@ -1,0 +1,8 @@
+#!/bin/bash
+
+random4=$(head -c2 /dev/urandom | od -t x2 -An)
+
+mqtt-recorder --host mqtt.defcon.org --port 8883 \
+              --username public --password 31337 --enable_ssl true \
+              --mode record --file  /dev/stdout \
+              --client_id "Meshtastic-$random4" --encode_b64

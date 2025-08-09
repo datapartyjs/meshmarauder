@@ -1,14 +1,16 @@
 {
-  "name": "meshtastic-marauder",
+  "name": "meshmarauder",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "watch": "nodemon ./test/decode-test.mjs",
     "forever": "forever start ./bin/pki-poison ~/bigblob.txt /dev/tty_lorapipe0",
-    "stop": "forever stopall"
+    "stop": "forever stopall",
+    "build-docs": "./scripts/build-docs.sh",
+    "generate-docs": "npx jsdoc --configure jsdoc.json --verbose"
   },
-  "author": "nullagent",
+  "author": "Dataparty LLC",
   "license": "GPL-3.0",
   "description": "",
   "dependencies": {
@@ -24,6 +26,8 @@
     "serialport": "^12.0.0"
   },
   "devDependencies": {
+    "clean-jsdoc-theme": "^4.3.0",
+    "jsdoc": "^4.0.4",
     "nodemon": "^3.1.10"
   }
 }

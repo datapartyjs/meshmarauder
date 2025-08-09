@@ -1,0 +1,57 @@
+{
+  "source": {
+    "include": ["bin/", "src/", "package.json", "readme.md"],
+    "includePattern": ".(mjs)$",
+    "exclude": ["src/index-browser.js"],
+      "excludePattern": "(node_modules/|docs/|dist/|src/index-browser.js)"
+  },
+
+  "plugins": ["plugins/markdown"],
+
+  "opts": {
+    "encoding": "utf8",
+    "readme": "./readme.md",
+    "tutorials": "tutorials",
+    "destination": "docs/",
+    "recurse": true,
+    "verbose": true,
+    "template": "./node_modules/clean-jsdoc-theme",
+    "theme_opts": {
+      "homepageTitle": "meshmarauder - framework for mesh radio pentesting",
+      "title": "meshmarauder",
+      "sections": ["Tutorials"],
+      "default_theme": "dark",
+      "displayModuleHeader": true,
+      "menu": [
+        {
+            "title": "Github",
+            "id": "github",
+            "link": "https://github.com/datapartyjs/meshmarauder"
+        }
+      ],
+      "meta": [
+        {
+            "name": "Author",
+            "content": "dataparty"
+        },
+        {
+            "name": "Description",
+            "content": "framework for mesh radio pentesting"
+        }
+      ],
+      "codepen": {
+        "enable_for": ["tutorials"],
+        "options": {
+          "js_pre_processor": "babel"
+        }
+      },
+      "footer": "<div style='margin-bottom: 0.5rem;'>meshmarauder</div> Fork: <a href='https://github.com/datapartyjs/meshmarauder'>https://github.com/datapartyjs/meshmarauder</a><br>Built by <a href='https://www.dataparty.xyz'>dataparty</a> with 🖤"
+    }
+  },
+
+  
+  "markdown": {
+      "hardwrap": false,
+      "idInHeadings": true
+  }
+}

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+usage() {
+    echo "Usage: $0 [-h]"
+    echo
+    echo "Options:"
+    echo "  STDIN         Input mqtt-recorder log file in standard input"
+    echo "  -h            Show this help message and exit"
+    exit 1
+}
+
+while IFS= read -r line; do
+    hex=$(echo $line | cut -d ',' -f2 | base64 -d \
+            | od -t x1 -An -w1024 | tr -d ' ')
+    echo "0,RXLOG,$hex"
+done
