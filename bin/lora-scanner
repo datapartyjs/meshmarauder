@@ -215,6 +215,16 @@ last_trigger_time=$(date +%s)  # Set start time
 while true; do
     now=$(date +%s)
     elapsed=$((now - last_trigger_time))
+    if read -t 0; then
+        while IFS= read -r line; do
+            regex='^txraw [0-9a-fA-F]+$'
+            if [[ "$line" =~ $regex]]; then
+                timestamp=$(date +%s)
+                resp=$(send_cmd "txraw $line")
+                echo "$timestamp,TXRAW_RESP,$resp"
+            fi
+        done
+    fi
     if [[ "$elapsed" -ge "$INTERVAL" ]]; then
         kill $loop_pid # kill the reading process
         wait $loop_pid # wait for it to terminate
