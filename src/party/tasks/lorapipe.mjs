@@ -54,8 +54,15 @@ export class LorapipeTask extends ITask.default {
       let meta = null
       let line = data.toString()
 
-      if(line.indexOf('RX') != -1){
-        let { seen, rssi, snr, raw } = parseInputPacket(line)
+      if(
+        line.indexOf('RAW') != -1 ||
+        line.indexOf('RX') != -1
+      ){
+        let initial = parseInputPacket(line)
+
+        if(initial == null){ continue }
+
+        let { seen, rssi, snr, raw } = initial
 
         let pkt = new LorapipeRawPacket(seen, rssi, snr, raw, CHANNELS)
 
