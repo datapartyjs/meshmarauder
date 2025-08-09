@@ -75,6 +75,8 @@ export function parseInputPacket(line){
       // olf format
       lineCleaned = lineCleaned.replace('RAW: ', '')
       packet.raw = Uint8Array.from(Buffer.from(lineCleaned, 'hex'))
+
+      return packet
     } else {
 
       //new csv format
