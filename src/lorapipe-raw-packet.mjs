@@ -1,4 +1,5 @@
 
+import { randomBytes } from '@noble/ciphers/webcrypto.js';
 import {fromBinary, toBinary} from '@bufbuild/protobuf'
 import * as protobufs from '@meshtastic/protobufs'
 import { UINT32_MAX } from '@bufbuild/protobuf/wire'
@@ -7,7 +8,11 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 import hkdf from '@panva/hkdf'
 
 
-import {tryDecryptChannelPacket, PortNumToProtoBuf, CHANNELS} from './utils.mjs'
+import {
+  tryDecryptChannelPacket, encryptChannelPacket,
+   PortNumToProtoBuf, CHANNELS,
+   uint32ToUint8Array
+} from './utils.mjs'
 
 export class LorapipeRawPacket {
 
@@ -71,6 +76,8 @@ export class LorapipeRawPacket {
       } catch (err){
         //encrypted 
 
+        //console.log('catch')
+
         this.parsed.encrypted = true
         this.parsed.decrypted = false
         this.parsed.decoded = false
@@ -87,10 +94,12 @@ export class LorapipeRawPacket {
         if(!data){ data = tryDecryptChannelPacket(raw, channels.Default); key='Default' }
         if(!data){ data = tryDecryptChannelPacket(raw, channels.Default2); key='Default2' }
       
-        this.parsed.data = data
-        this.parsed.decrypted = true
-
-        if(data){ this.parsed.channel = key }
+        
+        if(data){ 
+          this.parsed.channel = key
+          this.parsed.decrypted = true
+          this.parsed.data = data
+        }
 
       }
 
@@ -119,11 +128,85 @@ export class LorapipeRawPacket {
     //if(this.marauderKey != null){ return }
 
 
-    let seed = await hkdf('sha512', this.parsed.macaddr, new Uint8Array(32), '', 32)
+    let seed = await hkdf('sha512', this.parsed.content.macaddr, new Uint8Array(32), '', 32)
 
     const theKey = ed25519.keygen(seed)
-    console.log(theKey)
+    //console.log(theKey)
     return theKey
+  }
+
+  async genPoison(){
+    let { publicKey } = await this.genKey()
+    this.parsed.content.publicKey = publicKey
+    this.parsed.content.longName = this.parsed.content.longName + '🥷'
+
+    let scheme = PortNumToProtoBuf[ this.parsed.data.portnum ]
+
+    if(scheme != null && !this.short && this.parsed.decoded == true){
+
+      this.parsed.data.payload = toBinary( protobufs.Mesh.UserSchema, this.parsed.content  )
+
+      let rawPayload = toBinary(protobufs.Mesh.DataSchema, this.parsed.data)
+
+
+
+      let ppacketId = randomBytes(4)
+      const ppacketIdView = new DataView(ppacketId.buffer)
+
+            /*console.log(CHANNELS[this.parsed.channel])
+      console.log(rawPayload)
+      console.log(uint32ToUint8Array(this.header.from))
+      console.log(ppacketId)*/
+
+
+      //process.exit()
+
+      let encPayload = encryptChannelPacket(
+        CHANNELS[this.parsed.channel],
+        rawPayload,
+        uint32ToUint8Array(this.header.from),
+        ppacketId
+      )
+
+      let poisonPkt = new DataView( new ArrayBuffer(encPayload.byteLength + 16) )
+
+      for(let i=0; i<encPayload.byteLength; i++){
+        let val = encPayload.at(i)
+        poisonPkt.setUint8(i+16, val)
+      }
+
+      //if(this.parsed.is_broadcast){
+        //poisonPkt.setUint32(0, UINT32_MAX)
+      //} else {
+        poisonPkt.setUint32(0, this.header.to)
+      //}
+
+/*
+      hop_limit: this.header.flagsByte & 0x7,
+      want_ack: (this.header.flagsByte & 0x8) >> 3,
+      via_mqtt: (this.header.flagsByte & 0x10) >> 4,
+      hop_start:(this.header.flagsByte & 0xE0) >> 5 */
+
+      let flags = (
+        (7 & 0x7) |
+        (this.header.flagsByte & 0x8) |
+        (0 & 0x10) |  //say its not from mqtt
+        (0  & 0xE0)
+      )
+
+      
+      poisonPkt.setUint32(4, this.header.from)
+      poisonPkt.setUint32(8, ppacketIdView.getUint32(0))
+      poisonPkt.setUint8(12, flags)
+      poisonPkt.setUint8(13, this.header.channel)
+      poisonPkt.setUint8(14, this.header.next_hop)
+      poisonPkt.setUint8(15, this.header.relay_node)
+
+
+      return poisonPkt.buffer
+
+    }
+
   }
 
 

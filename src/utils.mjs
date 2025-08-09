@@ -26,9 +26,16 @@ export const PortNumToProtoBuf = {
   73: null  //Map report
 }
 
+export function uint32ToUint8Array(num) {
+  const buffer = new ArrayBuffer(4); // 4 bytes for a uint32
+  const view = new DataView(buffer);
+  view.setUint32(0, num); // true for little-endian, false for big-endian
+  return new Uint8Array(buffer);
+}
 
 
-function base64ToArrayBuffer(base64) {
+
+export function base64ToArrayBuffer(base64) {
     var binaryString = atob(base64);
     var bytes = new Uint8Array(binaryString.length);
     for (var i = 0; i < binaryString.length; i++) {
@@ -51,7 +58,11 @@ export const CHANNELS = {
 
 CHANNELS.Default[31] = 1
 
-
+export function buf2hex(buffer) { // buffer is an ArrayBuffer
+  return [...new Uint8Array(buffer)]
+      .map(x => x.toString(16).padStart(2, '0'))
+      .join('');
+}
 
 /**
  * 
@@ -172,7 +183,12 @@ export function encryptChannelPacket(channel_key, payload, from, packetId=null, 
     nonceView.setUint32( 4, packetIdView.getUint32(4) )
   }
   nonceView.setUint32( 8, fromView.getUint32(0) )
-  nonceView.setUint32( 12, extraNextraNonceViewonce.getUint32(0))
+  nonceView.setUint32( 12, extraNonceView.getUint32(0))
+
+  if(nonceView.byteLength != 16){
+    //console.log('size', nonceView.byteLength)  
+    //throw 'HEY'
+  }
 
   const ciphertext = ctr(channel_key, new Uint8Array(nonceView.buffer)).encrypt(payload)
   return ciphertext

