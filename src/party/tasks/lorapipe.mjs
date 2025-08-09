@@ -5,6 +5,8 @@ import * as ITask from '@dataparty/api/src/service/itask.js'
 
 import { spawn } from 'node:child_process'
 
+import { parseInputPacket, CHANNELS } from '../../utils.mjs'
+import { LorapipeRawPacket } from '../../lorapipe-raw-packet.mjs'
 
 
 export class LorapipeTask extends ITask.default {
@@ -46,10 +48,20 @@ export class LorapipeTask extends ITask.default {
     })
 
     this.child.stdout.on('data', (data) => {
-      console.log(`stdout: ${data}`);
 
-      this.emit('line', data)
-      this.context.party.topics.publishInternal('/packets', {line:data})
+
+      console.log(`stdout: ${data}`);
+      let meta = null
+      let line = data.toString()
+
+      if(line.indexOf('RX') != -1){
+        let { seen, rssi, snr, raw } = parseInputPacket(line)
+
+        let pkt = new LorapipeRawPacket(seen, rssi, snr, raw, CHANNELS)
+
+        this.emit('packet', pkt)
+        //this.context.party.topics.publishInternal('/packets', {line:data})
+      }
     });
 
     this.child.stderr.on('data', (data) => {

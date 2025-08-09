@@ -76,8 +76,8 @@ async function main(){
     args: ['-D','/dev/tty_lorapipe0', '-p', '917.25,500,7,8,2b']
   })
 
-  pipeTask.on('line', line=>{
-    console.log('line -', line.toString())
+  pipeTask.on('packet', pkt=>{
+    console.log('packet -', pkt)
   })
 
   console.log('started')
