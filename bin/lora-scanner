@@ -221,8 +221,8 @@ while true; do
             if [[ "$line" =~ $regex ]]; then
                 kill -STOP $loop_pid
                 timestamp=$(date +%s)
-                resp=$(send_cmd "txraw $line")
-                echo "$timestamp,TXRAW_RESP,$resp"
+                resp=$(send_cmd "$line")
+                echo "$timestamp,TXRAW,$resp"
                 kill -CONT $loop_pid
             fi
         done
