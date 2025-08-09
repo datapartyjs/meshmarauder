@@ -26,7 +26,10 @@ async function main() {
 
   for await (const line of rl) {
 
-    if(line.indexOf('RX') != -1){
+    if(
+      line.indexOf('RAW') != -1 ||
+      line.indexOf('RX') != -1
+    ){
       let initial = parseInputPacket(line)
 
       if(initial == null){ continue }

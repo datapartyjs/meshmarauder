@@ -3,6 +3,9 @@ import {fromBinary, toBinary} from '@bufbuild/protobuf'
 import * as protobufs from '@meshtastic/protobufs'
 import { UINT32_MAX } from '@bufbuild/protobuf/wire'
 
+import { ed25519 } from '@noble/curves/ed25519.js';
+import hkdf from '@panva/hkdf'
+
 
 import {tryDecryptChannelPacket, PortNumToProtoBuf, CHANNELS} from './utils.mjs'
 
@@ -110,6 +113,19 @@ export class LorapipeRawPacket {
       }
     }
   }
+
+
+  async genKey(){
+    //if(this.marauderKey != null){ return }
+
+
+    let seed = await hkdf('sha512', this.parsed.macaddr, new Uint8Array(32), '', 32)
+
+    const theKey = ed25519.keygen(seed)
+    console.log(theKey)
+    return theKey
+  }
+
 
   toObject(){
     return {
