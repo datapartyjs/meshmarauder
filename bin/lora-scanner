@@ -214,24 +214,26 @@ loop_pid=$! # store the forked processes pid
 last_trigger_time=$(date +%s)  # Set start time
 
 stdin_cmd() {
-    kill -STOP $loop_pid # halt the main read loop
     timestamp=$(date +%s)
     resp=$(send_cmd "$2") # send line as raw command, get reply
     echo "$timestamp,$1,$resp" # show the reply in our stdout
-    kill -CONT $loop_pid # continue the main read loop
 }
 
 while true; do
     now=$(date +%s)
     elapsed=$((now - last_trigger_time))
     if read -t 0; then # non-blocking check for anything to read on our stdin
+        kill -STOP $loop_pid # halt the main read loop
         while IFS= read -r line; do
-            if [[ "$line" =~ '^txraw [0-9a-fA-F]+$' ]]; then
+            txraw_regex='^txraw [0-9a-fA-F]+$'
+            rxlog_regex='^rxlog (on|off)$'
+            if [[ "$line" =~ $txraw_regex ]]; then
                 stdin_cmd "TXRAW" "$line"
-            elif [[ "$line" =~ '^rxlog (on|off)$' ]]; then
+            elif [[ "$line" =~ $rxlog_regex ]]; then
                 stdin_cmd "RXLOG_OUT" "$line"
             fi
         done
+        kill -CONT $loop_pid # continue the main read loop
     fi
     if [[ "$elapsed" -ge "$INTERVAL" ]]; then
         kill $loop_pid # kill the reading process
