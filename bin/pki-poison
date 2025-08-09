@@ -74,7 +74,7 @@ async function main() {
   readlineSync.setDefaultOptions({prompt: ''});
 
   for(let i=0; i<evilBuffer.length; i++){
-    process.stdout.write('txraw ' + buf2hex(evilBuffer[i]) + '\r\n')
+    process.stdout.write('txraw ' + buf2hex(evilBuffer[i]) + '\n')
 
     while(true){
       let input = readlineSync.prompt()
