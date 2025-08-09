@@ -190,7 +190,7 @@ export class LorapipeRawPacket {
       let flags = (
         (0xff & 0x7) |
         (this.header.flagsByte & 0x8) |
-        (0xff & 0x10) |  //say its not from mqtt
+        (this.header.flagsByte & 0x10) |  // mqtt
         (0xff  & 0xE0)
       )
 
