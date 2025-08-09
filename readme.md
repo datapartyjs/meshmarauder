@@ -9,8 +9,8 @@ Features
  - packet decoding
    * protocol header
    * unencrypted packets
-   * encrypted asymmetric channel messages
-   * encrypted symmetric messages (coming soon)
+   * encrypted symmetric channel messages
+   * encrypted asymmetric DM messages (coming soon)
  - PKI poisoning
  - User profile tampering
  - public channel impersonation (coming soon)
@@ -20,7 +20,7 @@ Features
 
 ## Join the fun
 
- * Flash [lorapipe](https://git.devhack.net/djt/lorapipe) to your favorite lora mesh device
+ * Flash [lorapipe](https://github.com/datapartyjs/lorapipe/) to your favorite lora mesh device
  * Install this repo
  * Run `./lora-scanner.sh` to listen for lora traffic
  * Run `./meshmarauder.sh` to start marauding (coming soon)
@@ -33,11 +33,14 @@ You must install using this command:
 
 If you use `npm i` it probably won't install.
 
+## Disclaimer
+
+This is a demonstration for DEFCON 33 and not recommended to be used on public default meshes.
 
 ## Follow & Support
 
- * Support - https://ko-fi.com/nullagent
- * Follow - https://partyon.xyz/@nullagent
+ * Support - [ko-fi.com/nullagent](https://ko-fi.com/nullagent)
+ * Follow - [partyon.xyz/@nullagent](https://partyon.xyz/@nullagent)
 
 ## Example
 
