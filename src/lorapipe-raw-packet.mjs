@@ -128,7 +128,7 @@ export class LorapipeRawPacket {
     //if(this.marauderKey != null){ return }
 
 
-    let seed = await hkdf('sha512', this.parsed.content.macaddr, new Uint8Array(32), '', 32)
+    let seed = await hkdf('sha512', this.parsed.content.macaddr, new Uint8Array(32), 'meshmarauder', 32)
 
     const theKey = ed25519.keygen(seed)
     //console.log(theKey)
@@ -188,10 +188,10 @@ export class LorapipeRawPacket {
       hop_start:(this.header.flagsByte & 0xE0) >> 5 */
 
       let flags = (
-        (7 & 0x7) |
+        (0xff & 0x7) |
         (this.header.flagsByte & 0x8) |
         (0 & 0x10) |  //say its not from mqtt
-        (0  & 0xE0)
+        (0xff  & 0xE0)
       )
 
       
