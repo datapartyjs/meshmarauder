@@ -41,6 +41,8 @@ async function main(){
     serverModels: {} //this is a hack to workaround a bug
   })
 
+  party.topics = new Dataparty.LocalTopicHost()
+
   const dbPath = 'dataparty-venue.db'
 
   debug('party db location', dbPath)
@@ -67,7 +69,16 @@ async function main(){
   await runner.start()
   await host.start()
 
-  await runner.loadTask('lorapipe')
+  //await runner.loadTask('lorapipe')
+  runner.tasks[LorapipeTask.Name] = LorapipeTask
+  
+  let pipeTask = await runner.spawnTask('lorapipe', {
+    args: ['-D','/dev/tty_lorapipe0', '-p', '917.25,500,7,8,2b']
+  })
+
+  pipeTask.on('line', line=>{
+    console.log('line -', line.toString())
+  })
 
   console.log('started')
   

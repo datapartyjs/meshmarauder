@@ -23,6 +23,8 @@ export class MarauderService extends DatapartySrv.IService {
     
     this.addSchema(Path.join(__dirname, './party/schema/lora-packet.js'))
 
+    this.addTopic(Path.join(__dirname, './party/topics/packet-topic.js'))
+
 
   }
 

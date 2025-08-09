@@ -3,6 +3,10 @@ const debug = Debug.default('marauder.task.lorapipe')
 import * as ITask from '@dataparty/api/src/service/itask.js'
 
 
+import { spawn } from 'node:child_process'
+
+
+
 export class LorapipeTask extends ITask.default {
 
   constructor(options){
@@ -14,6 +18,10 @@ export class LorapipeTask extends ITask.default {
 
     debug('new')
 
+    this.child = null
+    this.args = options.args
+
+
     this.duration = 5000
     this.timeout = null
   }
@@ -21,13 +29,36 @@ export class LorapipeTask extends ITask.default {
   static get Config(){
     return {
       background: true,
-      autostart: true
+      autostart: false
     }
   }
  
   async exec(){
 
     this.setTimer()
+
+    console.log('ctx args',this.context.args)
+
+    this.context.party.topics.getTopic('/packets')
+
+    this.child = spawn('./bin/lora-scanner', this.context.args, {
+      shell: '/bin/bash'
+    })
+
+    this.child.stdout.on('data', (data) => {
+      console.log(`stdout: ${data}`);
+
+      this.emit('line', data)
+      this.context.party.topics.publishInternal('/packets', {line:data})
+    });
+
+    this.child.stderr.on('data', (data) => {
+      console.error(`stderr: ${data}`);
+    });
+
+    this.child.on('close', (code) => {
+      console.log(`child process exited with code ${code}`);
+    });
 
     return this.detach()
   }
