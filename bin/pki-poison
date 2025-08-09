@@ -156,7 +156,18 @@ async function goMaraude(){
     port.write('txraw ' + buf2hex(buf) + '\r\n')
     
     let p = new Promise((resolve, reject)=>{
-      resolver = resolve
+
+      let resolved = false
+
+      let timeout = setTimeout(()=>{
+
+        process.stdout.write('!')
+
+        if(!resolved){resolve()}
+        resolved = true
+      }, 15000)
+
+      resolver = ()=>{ if(!resolved){resolve()}; clearTimeout(timeout); resolved = true }
     })
 
     await p
