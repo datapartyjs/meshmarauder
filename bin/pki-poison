@@ -6,11 +6,65 @@ import * as readline from 'readline'
 import { parseInputPacket, CHANNELS, buf2hex } from '../src/utils.mjs'
 import { LorapipeRawPacket } from '../src/lorapipe-raw-packet.mjs'
 
-import * as readlineSync from 'readline-sync'
-
 let evilBuffer = []
-
 let modeBuffer = true
+
+let macaddrs = {
+
+}
+
+let counts = {
+  lines: 0,
+  packets: 0,
+  users: 0,
+  evils: 0
+}
+
+import { SerialPort } from 'serialport'
+import { ReadlineParser } from '@serialport/parser-readline'
+const port = new SerialPort({ path: process.argv[3] || '/dev/tty_lorapipe0', baudRate: 115200 })
+
+async function handleLine(line){
+  counts.lines++
+
+    try{
+
+      if(
+        line.indexOf('RAW') != -1 ||
+        line.indexOf('RX') != -1
+      ){
+        let initial = parseInputPacket(line)
+
+        if(initial == null){ return }
+
+        let { seen, rssi, snr, raw } = initial
+
+        let pkt = new LorapipeRawPacket(seen, rssi, snr, raw, CHANNELS)
+
+        counts.packets++
+
+        //! is it a user broadcast?
+        if(pkt.parsed && pkt.parsed.content && pkt.parsed.content['$typeName'] == 'meshtastic.User'){
+
+          if(macaddrs[ pkt.parsed.content.id ] != null && macaddrs[ pkt.parsed.content.id ] != undefined){ return }
+
+          counts.users++
+
+          let evil = await pkt.genPoison()
+          
+          if(evil){
+
+            macaddrs[ pkt.parsed.content.id ] = evil
+            counts.evils++
+
+          }
+
+        }
+      }
+    } catch(err){
+      //
+    }
+}
 
 async function main() {
   console.log(process.argv)
@@ -32,56 +86,65 @@ async function main() {
   // crlfDelay option to clean up CR LF to a one line break
 
   for await (const line of rl) {
-
-    try{
-
-      if(
-        line.indexOf('RAW') != -1 ||
-        line.indexOf('RX') != -1
-      ){
-        let initial = parseInputPacket(line)
-
-        if(initial == null){ continue }
-
-        let { seen, rssi, snr, raw } = initial
-
-        let pkt = new LorapipeRawPacket(seen, rssi, snr, raw, CHANNELS)
-
-        //! is it a user broadcast?
-        if(pkt.parsed && pkt.parsed.content && pkt.parsed.content['$typeName'] == 'meshtastic.User'){
-
-          /*console.log(line)
-          console.log(pkt.parsed.content)
-          console.log(pkt.header)*/
-
-
-          let evil = await pkt.genPoison()
-          
-          if(evil){
-
-            evilBuffer.push(evil)
-
-
-          }
-
-        }
-      }
-    } catch(err){
-      //
-    }
+    await handleLine(line)
   }
 
-  readlineSync.setDefaultOptions({prompt: ''});
+  console.log('Analyzed ', counts)
 
-  for(let i=0; i<evilBuffer.length; i++){
-    process.stdout.write('txraw ' + buf2hex(evilBuffer[i]) + '\r\n')
 
-    while(true){
-      let input = readlineSync.prompt()
-      if(input.indexOf('OK') != -1){
-        break
-      }
+  function waitforme(millisec) {
+    return new Promise(resolve => {
+        setTimeout(() => { resolve() }, millisec);
+    })
+  }
+
+  let resolver = null
+
+  const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }))
+
+  parser.once('data', async (line)=>{
+    console.log('[',line,']')
+    if(line.indexOf('OK') != -1 && resolver != null){
+      resolver()
+    
+    } else if(line.indexOf('RXLOG')!=-1){
+      //log line
+      console.log('got a line from the air')
+      await handleLine()
+
+      fs.appendFileSync('air-log.csv', line+'\n');
+
     }
+  })
+
+
+
+  for(let i=0; i<Object.keys(macaddrs).length; i++){
+
+    let buf = Object.values(macaddrs)[i]
+    process.stdout.write('txraw ' + buf2hex(buf) + '\r\n')
+
+    port.write('txraw ' + buf2hex(buf) + '\r\n')
+    
+
+
+    let p = new Promise((resolve,reject)=>{
+      resolver = resolve
+
+      parser.once('data', (line)=>{
+        console.log('[',line,']')
+        //if(line.indexOf('OK') != null){
+          resolve()
+          //parser.off('data')
+        //}
+      })
+    })
+
+    await p
+    console.log('OK')
+
+    await waitforme(1337*10)
+    
     
   }
 }

@@ -188,10 +188,10 @@ export class LorapipeRawPacket {
       hop_start:(this.header.flagsByte & 0xE0) >> 5 */
 
       let flags = (
-        (7 & 0x7) |
+        (0xff & 0x7) |
         (this.header.flagsByte & 0x8) |
         (0 & 0x10) |  //say its not from mqtt
-        (0  & 0xE0)
+        (0xff  & 0xE0)
       )
 
       
