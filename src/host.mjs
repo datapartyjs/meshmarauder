@@ -43,16 +43,15 @@ async function main(){
 
   party.topics = new Dataparty.LocalTopicHost()
 
-  const dbPath = 'dataparty-venue.db'
+  /*const dbPath = 'dataparty-venue.db'
 
   debug('party db location', dbPath)
 
-  /*let party = new Dataparty.LocalParty({
+  let party = new Dataparty.LocalParty({
     path: dbPath,
     model: build.schemas,
     config: new Dataparty.Config.MemoryConfig()
   })*/
-
 
 
   debug('partying')

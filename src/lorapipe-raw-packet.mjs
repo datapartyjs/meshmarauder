@@ -111,4 +111,13 @@ export class LorapipeRawPacket {
     }
   }
 
+  toObject(){
+    return {
+      meta:this.meta,
+      header: this.header,
+      parsed: this.parsed,
+      short: this.short
+    }
+  }
+
 }

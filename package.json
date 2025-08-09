@@ -2,6 +2,7 @@
   "name": "meshtastic-marauder",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "watch": "nodemon ./test/decode-test.mjs"
   },
