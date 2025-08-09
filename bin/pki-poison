@@ -17,12 +17,15 @@ let counts = {
   lines: 0,
   packets: 0,
   users: 0,
-  evils: 0
+  evils: 0,
+  sent: 0
 }
 
 import { SerialPort } from 'serialport'
 import { ReadlineParser } from '@serialport/parser-readline'
 const port = new SerialPort({ path: process.argv[3] || '/dev/tty_lorapipe0', baudRate: 115200 })
+
+let ingestComplete = false
 
 async function handleLine(line){
   counts.lines++
@@ -54,16 +57,122 @@ async function handleLine(line){
           
           if(evil){
 
+            if(ingestComplete){ 
+              process.stdout.write('🥷')
+            }
+
             macaddrs[ pkt.parsed.content.id ] = evil
             counts.evils++
 
           }
 
+        } else {
+          if(pkt.parsed && pkt.parsed.content && pkt.parsed.content['$typeName'] == 'meshtastic.Position'){
+            if(ingestComplete){ 
+              process.stdout.write('📍')
+            }
+          }
         }
       }
     } catch(err){
       //
     }
+}
+
+let lastSendComplete = null
+
+async function goMaraude(){
+
+  let startTime = Date.now()
+  console.log('Analyzed ', counts)
+  let stats = {
+    counts,
+    startTime,
+    currentIdx:null,
+    currentNodeId:null,
+    lastSendComplete:null
+  }
+  fs.appendFileSync('marauder-status.json', JSON.stringify(stats,null,2));
+
+  function waitforme(millisec) {
+    return new Promise(resolve => {
+        setTimeout(() => { resolve() }, millisec);
+    })
+  }
+
+  let resolver = null
+
+  let lastStats = Date.now()
+
+  const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }))
+
+  parser.on('data', async (line)=>{
+    //console.log('[',line,']')
+    if(line.indexOf('OK') != -1 && resolver != null){
+      resolver()
+      resolver = null
+    
+    } else if(line.indexOf('RXLOG')!=-1){
+      //log line
+      //console.log('got a line from the air')
+      await handleLine(line)
+
+      process.stdout.write('+')
+
+      fs.appendFileSync('air-log.csv', line+'\n');
+
+    }
+  })
+
+  let statsTimer = setInterval(()=>{
+
+    let now = Date.now()
+
+    let deltaMs = now - lastSendComplete 
+    //fs.appendFileSync('status', JSON.stringify(stats,null,2));
+
+    if(deltaMs > 120*1000){
+      console.log('FATAL - sending seems stuck')
+      process.exit()
+    }
+
+    console.log('\n',stats)
+  }, 30000)
+
+  let startIdx = Math.floor(Math.random()*Object.keys(macaddrs).length)
+
+  for(let i=startIdx; i<Object.keys(macaddrs).length; i++){
+
+    let now = Date.now()
+
+    let key = Object.keys(macaddrs)[i]
+    let buf = macaddrs[key]
+
+    stats.currentIdx = i
+    stats.currentNodeId = key
+
+    //process.stdout.write('txraw ' + buf2hex(buf) + '\n')
+
+    port.write('txraw ' + buf2hex(buf) + '\r\n')
+    
+    let p = new Promise((resolve, reject)=>{
+      resolver = resolve
+    })
+
+    await p
+    //console.log('OK')
+    process.stdout.write('.')
+
+    lastSendComplete = Date.now()
+    counts.sent++
+    stats.lastSendComplete = lastSendComplete
+
+    await waitforme(1337*4)
+  }
+
+  let endTime = Date.now()
+
+  clearInterval(statsTimer)
 }
 
 async function main() {
@@ -89,53 +198,12 @@ async function main() {
     await handleLine(line)
   }
 
-  console.log('Analyzed ', counts)
+  ingestComplete = true
 
-  function waitforme(millisec) {
-    return new Promise(resolve => {
-        setTimeout(() => { resolve() }, millisec);
-    })
+  while(true){
+    await goMaraude()
   }
-
-  let resolver = null
-
-  const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }))
-
-  parser.on('data', async (line)=>{
-    console.log('[',line,']')
-    if(line.indexOf('OK') != -1 && resolver != null){
-      resolver()
-    
-    } else if(line.indexOf('RXLOG')!=-1){
-      //log line
-      console.log('got a line from the air')
-      await handleLine(line)
-
-      fs.appendFileSync('air-log.csv', line+'\n');
-
-    }
-  })
-
-
-
-  for(let i=0; i<Object.keys(macaddrs).length; i++){
-
-    let buf = Object.values(macaddrs)[i]
-    process.stdout.write('txraw ' + buf2hex(buf) + '\r\n')
-
-    port.write('txraw ' + buf2hex(buf) + '\r\n')
-    
-    let p = new Promise((resolve, reject)=>{
-      resolver = resolve
-    })
-
-    await p
-    console.log('OK')
-
-    await waitforme(1337*4)
-    
-    
-  }
+  
 }
 
 main();
