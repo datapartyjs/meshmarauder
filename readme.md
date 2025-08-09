@@ -11,7 +11,8 @@ Features
    * unencrypted packets
    * encrypted asymmetric channel messages
    * encrypted symmetric messages (coming soon)
- - PKI poisoning (coming soon)
+ - PKI poisoning
+ - User profile tampering
  - public channel impersonation (coming soon)
  - MITM private messages (coming soon)
  - Location spoofing (coming soon)
