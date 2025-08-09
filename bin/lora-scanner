@@ -218,7 +218,7 @@ while true; do
     if read -t 0; then
         while IFS= read -r line; do
             regex='^txraw [0-9a-fA-F]+$'
-            if [[ "$line" =~ $regex]]; then
+            if [[ "$line" =~ $regex ]]; then
                 timestamp=$(date +%s)
                 resp=$(send_cmd "txraw $line")
                 echo "$timestamp,TXRAW_RESP,$resp"
