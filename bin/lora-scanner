@@ -219,9 +219,11 @@ while true; do
         while IFS= read -r line; do
             regex='^txraw [0-9a-fA-F]+$'
             if [[ "$line" =~ $regex ]]; then
+                kill -STOP $loop_pid
                 timestamp=$(date +%s)
                 resp=$(send_cmd "txraw $line")
                 echo "$timestamp,TXRAW_RESP,$resp"
+                kill -CONT $loop_pid
             fi
         done
     fi
