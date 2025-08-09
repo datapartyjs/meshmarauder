@@ -3,6 +3,55 @@ import { ctr } from '@noble/ciphers/aes.js'
 import {fromBinary, toBinary} from '@bufbuild/protobuf'
 import * as protobufs from '@meshtastic/protobufs'
 
+export const PortNumToProtoBuf = {
+  0: null, //binary - unknown packet format
+  1: null, // utf-8 - chat message
+  2: protobufs.Mesh.NodeRemoteHardwarePinSchema,
+  3: protobufs.Mesh.PositionSchema,
+  4: protobufs.Mesh.UserSchema,
+  5: protobufs.Mesh.RoutingSchema,
+  6: protobufs.Admin.AdminMessageSchema,
+  7: null, //Unishox2 Compressed utf-8
+  8: protobufs.Mesh.WaypointSchema,
+  9: null, //codec2 packets
+  10: null,
+  12: protobufs.Mesh.KeyVerificationSchema,
+  // 'ping' - replies to all packets.
+  // type - char[]
+  32: null, 
+  // send and receive telemetry data
+  // type - Protobuf
+  67: null, //Telemetry
+  70: null, //traceroute
+  73: null  //Map report
+}
+
+
+
+function base64ToArrayBuffer(base64) {
+    var binaryString = atob(base64);
+    var bytes = new Uint8Array(binaryString.length);
+    for (var i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return new Uint8Array(bytes.buffer);
+}
+
+
+export const CHANNELS = {
+  Default: new Uint8Array(32),
+  Default2: new Uint8Array([
+    0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
+    0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01
+  ]),
+  DEFCONnect: base64ToArrayBuffer('OEu8wB3AItGBvza4YSHh+5a3LlW/dCJ+nWr7SNZMsaE='),
+  HackerComms: base64ToArrayBuffer('6IzsaoVhx1ETWeWuu0dUWMLqItvYJLbRzwgTAKCfvtY='),
+  NodeChat: base64ToArrayBuffer('TiIdi8MJG+IRnIkS8iUZXRU+MHuGtuzEasOWXp4QndU=')
+}
+
+CHANNELS.Default[31] = 1
+
+
 
 /**
  * 

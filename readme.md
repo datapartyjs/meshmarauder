@@ -37,3 +37,8 @@ If you use `npm i` it probably won't install.
 
  * Support - https://ko-fi.com/nullagent
  * Follow - https://partyon.xyz/@nullagent
+
+## Example
+
+
+`./bin/lora-scanner -D /dev/tty_lorapipe0 -p 917.25,500,7,8,2b | ./bin/lora-decoder`
