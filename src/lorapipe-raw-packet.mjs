@@ -128,7 +128,7 @@ export class LorapipeRawPacket {
     //if(this.marauderKey != null){ return }
 
 
-    let seed = await hkdf('sha512', this.parsed.content.macaddr, new Uint8Array(32), '', 32)
+    let seed = await hkdf('sha512', this.parsed.content.macaddr, new Uint8Array(32), 'meshmarauder', 32)
 
     const theKey = ed25519.keygen(seed)
     //console.log(theKey)

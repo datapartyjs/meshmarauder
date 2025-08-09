@@ -102,7 +102,7 @@ async function main() {
 
   const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }))
 
-  parser.once('data', async (line)=>{
+  parser.on('data', async (line)=>{
     console.log('[',line,']')
     if(line.indexOf('OK') != -1 && resolver != null){
       resolver()
@@ -110,7 +110,7 @@ async function main() {
     } else if(line.indexOf('RXLOG')!=-1){
       //log line
       console.log('got a line from the air')
-      await handleLine()
+      await handleLine(line)
 
       fs.appendFileSync('air-log.csv', line+'\n');
 
@@ -126,18 +126,8 @@ async function main() {
 
     port.write('txraw ' + buf2hex(buf) + '\r\n')
     
-
-
-    let p = new Promise((resolve,reject)=>{
+    let p = new Promise((resolve, reject)=>{
       resolver = resolve
-
-      parser.once('data', (line)=>{
-        console.log('[',line,']')
-        //if(line.indexOf('OK') != null){
-          resolve()
-          //parser.off('data')
-        //}
-      })
     })
 
     await p
