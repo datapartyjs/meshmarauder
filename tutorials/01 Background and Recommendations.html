@@ -1,0 +1,110 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial - Exploit - Posion PKI</title>
+</head>
+<body>
+    <h2>Why This Works</h2>
+    <p>The Meshtastic firmware and application will automatically update a
+        contact to use the latest public key seen in a NodeInfo packet sent by
+        a user. Unique users are determined by the app based on the hardware
+        MAC address of the node, which are sent in (or along side) NodeInfo
+        packets along with a bunch of other information about the node, such
+        as it's long and short name, public key, geographic position, and some
+        other data which can be observed in the protobufs.</p>
+    <p>Meshtastic NodeInfo packets are not cryptographically signed with the
+        node's public key, and neither are messages sent to any of the
+        symmetrically encrypted group chats. There is currently no way to prove
+        the authenticity of a Meshtastic message, and that likely includes DMs 
+        as well.</p>
+    <p>As a result of these design decisions, as well as poorly designed UX in
+        the phone app, the NodeInfo of any node can have its public key field
+        simply modified to an attacker controlled public key, and rebroadcast
+        out to the mesh to poison the contact on any nearby Meshtastic device
+        which is using the same modem preset and channel settings.
+    <p>Users who had the poisoned node's old legitimate public key in their
+        contacts from before the poisoning attack will get an alert that the
+        contact's public key has changed and to verify it with the owner of the
+        node, but only after clicking on a poisoned contact in the UI. A red
+        broken "unsecure" lock is shown to users who have seen a node's intial
+        public key change.</p>
+    <p>Users who are hearing that NodeInfo for the first time will add it as a
+        new contact, and put a green secure lock icon on the contact, because
+        the Meshtastic code will trust the first public key it sees broadcast
+        by a MAC address. Subsequent valid (legitimate), non-poisoned keys sent
+        in NodeInfos by the actual real user of the node will cause users who
+        FIRST heard poisoned keys for another node to experience condition
+        described above, where the Meshtastic UI will warn about potential key
+        compromise and display a red broken lock to the user.</p>
+    <p>In addition to public key poisoning attack, any arbitrary field of the
+        NodeInfo packet can be changed <b>while leaving the legitimate public
+        key in tact</b>, and the forged NodeInfo can be sent out, which will
+        cause any nearby node on the same mesh to update the field in their own
+        contact database. This works because NodeInfo packets are not
+        cryptographically signed in any way.</p>
+    <p></p>
+
+    <h2>Unintended Side Effects</h2>
+    <p>The rabbit hole goes a lot deeper than we initially anticipated and some
+        of these attack vectors were thought up while exploit development was
+        already underway. In addition, there was some entirely unexpected and 
+        surprising behavior observed from the phone application which was not
+        closely audited during the course of this research.</p>
+    <p>The most notable unintended side effect observed during our research is
+        that poisoned nodes will sometimes set their own name in the phone app
+        to the name specified by the attacker while poisoning. Reports seem to
+        indicate that restarting the node or app will cause the node's
+        displayed name to revert to the name set by the owner. As far as we're
+        able to tell, this is a display bug, but it is an indicator that
+        untrusted input may be allowed into places it should never make it in
+        other parts of the codebase as well.</p>
+    <p></p>
+
+    <h2>Specific Recommendations</h2>
+    <h3>To Meshtastic users</h3>
+    <p>Meshtastic in its current form should not be used as a trusted
+        communication medium between a large untrusted group of users.
+        Participating in large public channels exposes you to the effects of
+        these attacks.</p>
+    <p>Meshtastic in its current form is probably mostly okay as a fairly
+        trustworthy communication medium for a small group of individuals who 
+        mutually trust one another not to spy on or tamper with communications
+        to one another. Bear in mind that the packet headers are unencrypted,
+        so some of your private mesh's metadata is still snoopable.</p>
+    <p></p>
+
+    <h3>To Meshtastic developers</h3>
+    <p>The hardware MAC address isn't easy for users to change and is easily
+        trackable across meshes. It is a fairly poor unique ID indicator for a
+        user due to it's trackable and non-cryptographic nature. Given the
+        types of large and public untrusted mesh environments Meshtastic seems
+        to be marketing itself towards, it is the opinion of the authors of this
+        tool that using a MAC address as a unique node ID is unwise.</p>
+    <p>An asymmetric key pair should already be unique in order to serve its
+        purpose. The public key is inherantly public, and must be accessible in 
+        order for other parties to securely send data to each other. It would
+        make sense for the public key to be used as the main indicator of a
+        unique user. Including the node's hardware MAC address in non-encrypted
+        fields of the packet, or in fields that are decryptable with a
+        symmetric key which is shared by hundreds or thousands of people is a
+        recipe for allowing said users to get tracked or stalked.</p>
+    <p>Meshtastic would be wise to implement a stronger Trust-on-First-Use
+        model that makes users aware of the importance of cross-verifying their
+        keys over a trusted channel. Keys should not automatically be "trusted"
+        the first time they are <b>seen</b>, especially without any user interaction.
+        We understand that it was a design choice that was made to make the
+        use of the protocol easier for new and less experienced users, but we
+        argue that it is deceptive to use of secure looking green lock icon for
+        contacts which have had no actual cryptographic verification of their
+        identities performed on, either manually by the user, or even
+        cryptographically through signatures.</p>
+    <p>Meshtastic SHOULD cryptographically sign all messages sent to the mesh,
+        ESPECIALLY portions of messages that are not encrypted, or in fields
+        that are decryptable with a common shared key. Cryptographic signatures
+        are the best way to ensure packet integrity and authenticity.</p>
+    <p></p>
+
+</body>
+</html>
