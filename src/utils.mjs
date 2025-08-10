@@ -58,6 +58,13 @@ export const CHANNELS = {
 
 CHANNELS.Default[31] = 1
 
+export const OUTBOUND_CHANNELS = {
+  DEFCONnect: base64ToArrayBuffer('OEu8wB3AItGBvza4YSHh+5a3LlW/dCJ+nWr7SNZMsaE='),
+  HackerComms: base64ToArrayBuffer('6IzsaoVhx1ETWeWuu0dUWMLqItvYJLbRzwgTAKCfvtY='),
+  NodeChat: base64ToArrayBuffer('TiIdi8MJG+IRnIkS8iUZXRU+MHuGtuzEasOWXp4QndU=')
+}
+
+
 export function buf2hex(buffer) { // buffer is an ArrayBuffer
   return [...new Uint8Array(buffer)]
       .map(x => x.toString(16).padStart(2, '0'))
