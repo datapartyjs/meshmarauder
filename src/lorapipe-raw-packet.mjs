@@ -11,6 +11,7 @@ import hkdf from '@panva/hkdf'
 import {
   tryDecryptChannelPacket, encryptChannelPacket,
    PortNumToProtoBuf, CHANNELS,
+   OUTBOUND_CHANNELS,
    uint32ToUint8Array
 } from './utils.mjs'
 
@@ -117,10 +118,69 @@ export class LorapipeRawPacket {
         this.parsed.decoded = true
       } else if(this.parsed.data.portnum == 1) {
         this.parsed.content = this.parsed.data.payload
+
+        //console.log(this.parsed.data)
+        console.log(new Date(this.meta.seen), this.header.from, this.parsed.channel, '-', new TextDecoder().decode(this.parsed.content))
+
         delete this.parsed.data.payload
         this.parsed.decoded = true
       }
     }
+  }
+
+  async channelChat(key, text){
+    let rawPayload = toBinary(protobufs.Mesh.DataSchema,
+      {  '$typeName': 'meshtastic.Data',
+        portnum: 1,
+        payload: new TextEncoder().encode(text),
+        wantResponse: false,
+        //dest: 0,
+        //source: 0,
+        //requestId: 0,
+        //replyId: 0,
+        //emoji: 0,
+        //bitfield: 0
+      }
+    )
+
+      
+
+    let ppacketId = randomBytes(4)
+    const ppacketIdView = new DataView(ppacketId.buffer)
+
+    let encPayload = encryptChannelPacket(
+      OUTBOUND_CHANNELS[key] ? OUTBOUND_CHANNELS[key] : OUTBOUND_CHANNELS.DEFCONnect,
+      rawPayload,
+      uint32ToUint8Array(this.header.from),
+      ppacketId
+    )
+
+    let forgedPkt = new DataView( new ArrayBuffer(encPayload.byteLength + 16) )
+
+    for(let i=0; i<encPayload.byteLength; i++){
+      let val = encPayload.at(i)
+      forgedPkt.setUint8(i+16, val)
+    }
+
+    forgedPkt.setUint32(0, UINT32_MAX)
+
+    let flags = (
+      (0xff & 0x7) |
+      (this.header.flagsByte & 0x8) |
+      (this.header.flagsByte & 0x10) |  // mqtt
+      (0xff  & 0xE0)
+    )
+
+    
+    forgedPkt.setUint32(4, this.header.from)
+    forgedPkt.setUint32(8, ppacketIdView.getUint32(0))
+    forgedPkt.setUint8(12, flags)
+    forgedPkt.setUint8(13, this.header.channel)
+    forgedPkt.setUint8(14, this.header.next_hop)
+    forgedPkt.setUint8(15, this.header.relay_node)
+
+
+    return forgedPkt.buffer
   }
 
 
@@ -162,7 +222,7 @@ export class LorapipeRawPacket {
       //process.exit()
 
       let encPayload = encryptChannelPacket(
-        CHANNELS[this.parsed.channel],
+        OUTBOUND_CHANNELS[this.parsed.channel] || OUTBOUND_CHANNELS.DEFCONnect,
         rawPayload,
         uint32ToUint8Array(this.header.from),
         ppacketId
