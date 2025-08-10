@@ -71,8 +71,11 @@
     <p>Meshtastic in its current form is probably mostly okay as a fairly
         trustworthy communication medium for a small group of individuals who 
         mutually trust one another not to spy on or tamper with communications
-        to one another. Bear in mind that the packet headers are unencrypted,
-        so some of your private mesh's metadata is still snoopable.</p>
+        to one another. When using Meshtastic between a smaller trusted group
+        of individuals, be sure to use your own frequency, modem settings, and
+        encryption keys that are different from the defaults. Bear in mind that
+        the packet headers are unencrypted, so some of your private mesh's
+        metadata is still snoopable.</p>
     <p></p>
 
     <h3>To Meshtastic developers</h3>
@@ -93,13 +96,13 @@
     <p>Meshtastic would be wise to implement a stronger Trust-on-First-Use
         model that makes users aware of the importance of cross-verifying their
         keys over a trusted channel. Keys should not automatically be "trusted"
-        the first time they are <b>seen</b>, especially without any user interaction.
-        We understand that it was a design choice that was made to make the
-        use of the protocol easier for new and less experienced users, but we
-        argue that it is deceptive to use of secure looking green lock icon for
-        contacts which have had no actual cryptographic verification of their
-        identities performed on, either manually by the user, or even
-        cryptographically through signatures.</p>
+        the first time they are <b>seen</b>, especially without any user
+        interaction. We understand that this may have been a design choice to
+        make the use of the protocol and application easier for new and less
+        experienced users, but we argue that it is deceptive to use a secure
+        looking green lock icon for contacts which have had no actual
+        cryptographic verification of their identities performed on, either
+        manually by the user, or even cryptographically through signatures.</p>
     <p>Meshtastic SHOULD cryptographically sign all messages sent to the mesh,
         ESPECIALLY portions of messages that are not encrypted, or in fields
         that are decryptable with a common shared key. Cryptographic signatures
