@@ -6,10 +6,37 @@
     <title>Tutorial - Setup meshmarauder hardware</title>
 </head>
 <body>
+    <p>To get set up, you're going to need LoRA node hardware. Anything on the
+        list of the <a href="https://flasher.meshcore.dev/">Meshcore
+        flasher</a> will work, as lorapipe is based on a very stripped down
+        copy of Meshcore.</pp>
+        
+    <p>Git clone
+        <a href="https://github.com/datapartyjs/lorapipe/">lorapipe</a>,
+        and install PlatformIO, for example, on Ubuntu: </p>
 
+    <pre>
+    $ sudo apt install git platformio
+    $ git clone https://github.com/datapartyjs/lorapipe/
+    </pre>
+    
+    <p>Build and flash the firmware using PlatformIO: </p>
 
+    <pre>
+    $ cd lorapipe
+    $ platformio run --environment Xiao_S3_WIO_Repeater
+    $ platformio run --target upload --environment Xiao_S3_WIO_Repeater
+    </pre>
 
+    <p>Visual Studio Code's PlatformIO extension is extremely convenient, and
+        will handle much of this for you!</p>
 
-
+    <p>Once you have your hardware flashed with lorapipe, you're ready to start
+        recording and sending LoRA traffic. lorapipe gives users an interface
+        to send and recieve raw bytes encoded using almost any LoRA modem
+        preset (frequency, bandwidth, spread factor, coding rate, and sync
+        word). This gives users the ability to send and recieve raw data over
+        LoRA in a manner that is entirely agnostic of any overlying packet
+        format.</p>
 </body>
 </html>
