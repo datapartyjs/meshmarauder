@@ -1,0 +1,240 @@
+#!/usr/bin/env node
+":" //# comment; exec /usr/bin/env node --input-type=module - "$@" < "$0"
+import * as fs from 'fs'
+import * as readline from 'readline'
+
+import { parseInputPacket, CHANNELS,OUTBOUND_CHANNELS, buf2hex } from '../src/utils.mjs'
+import { LorapipeRawPacket } from '../src/lorapipe-raw-packet.mjs'
+
+let evilBuffer = []
+let modeBuffer = true
+
+let macaddrs = {
+
+}
+
+let counts = {
+  lines: 0,
+  packets: 0,
+  users: 0,
+  evils: 0,
+  sent: 0
+}
+
+import { SerialPort } from 'serialport'
+import { ReadlineParser } from '@serialport/parser-readline'
+const port = new SerialPort({ path: process.argv[3] || '/dev/tty_lorapipe0', baudRate: 115200 })
+
+let ingestComplete = false
+
+
+let MESSAGES = [
+  "🥷📢 hello, we've been trying to contact you about your mesh's extended warranty",
+  "🥷📢 https://youtu.be/dQw4w9WgXcQ",
+  "🥷📢 all ur mesh are belong to us",
+  "🥷📢 nothing is signed",
+  "🥷📢 do not use this medium for sensitive communications"
+]
+
+function randomString(){
+
+  let idx = Math.round((MESSAGES.length -1) * Math.random())
+
+  return MESSAGES[idx] 
+}
+
+async function handleLine(line){
+  counts.lines++
+
+    try{
+
+      if(
+        line.indexOf('RAW') != -1 ||
+        line.indexOf('RX') != -1
+      ){
+        let initial = parseInputPacket(line)
+
+        if(initial == null){ return }
+
+        let { seen, rssi, snr, raw } = initial
+
+        let pkt = new LorapipeRawPacket(seen, rssi, snr, raw, CHANNELS)
+
+        counts.packets++
+
+        //! is it a user interaction
+        if(pkt.parsed && pkt.parsed.content){
+
+          if(macaddrs[ pkt.parsed.content.id ] != null && macaddrs[ pkt.parsed.content.id ] != undefined){ return }
+
+          counts.users++
+
+          let idx = Math.round( (Object.keys(OUTBOUND_CHANNELS).length-1) * Math.random() )
+          let outboundKey = Object.keys(OUTBOUND_CHANNELS)[idx]
+
+          let evil = await pkt.channelChat(outboundKey, randomString())
+          
+          if(evil){
+
+            if(ingestComplete){ 
+              process.stdout.write('🥷')
+            }
+
+            macaddrs[ pkt.parsed.content.id ] = evil
+            counts.evils++
+
+          }
+
+        } else {
+          if(pkt.parsed && pkt.parsed.content && pkt.parsed.content['$typeName'] == 'meshtastic.Position'){
+            if(ingestComplete){ 
+              process.stdout.write('📍')
+            }
+          }
+        }
+      }
+    } catch(err){
+      //
+      console.log(err)
+    }
+}
+
+let lastSendComplete = null
+
+async function goMaraude(){
+
+  let startTime = Date.now()
+  console.log('Analyzed ', counts)
+  let stats = {
+    counts,
+    startTime,
+    currentIdx:null,
+    currentNodeId:null,
+    lastSendComplete:null
+  }
+  fs.appendFileSync('marauder-status.json', JSON.stringify(stats,null,2));
+
+  function waitforme(millisec) {
+    return new Promise(resolve => {
+        setTimeout(() => { resolve() }, millisec);
+    })
+  }
+
+  let resolver = null
+
+  let lastStats = Date.now()
+
+  const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }))
+
+  parser.on('data', async (line)=>{
+    //console.log('[',line,']')
+    if(line.indexOf('OK') != -1 && resolver != null){
+      resolver()
+      resolver = null
+    
+    } else if(line.indexOf('RXLOG')!=-1){
+      //log line
+      //console.log('got a line from the air')
+      await handleLine(line)
+
+      process.stdout.write('+')
+
+      fs.appendFileSync('air-log.csv', line+'\n');
+
+    }
+  })
+
+  let statsTimer = setInterval(()=>{
+
+    let now = Date.now()
+
+    let deltaMs = now - lastSendComplete 
+    //fs.appendFileSync('status', JSON.stringify(stats,null,2));
+
+    if(deltaMs > 120*1000){
+      console.log('FATAL - sending seems stuck')
+      process.exit()
+    }
+
+    console.log('\n',stats)
+  }, 30000)
+
+  let startIdx = Math.floor(Math.random()*Object.keys(macaddrs).length)
+
+  for(let i=startIdx; i<Object.keys(macaddrs).length; i++){
+
+    let now = Date.now()
+
+    let key = Object.keys(macaddrs)[i]
+    let buf = macaddrs[key]
+
+    stats.currentIdx = i
+    stats.currentNodeId = key
+
+    //process.stdout.write('txraw ' + buf2hex(buf) + '\n')
+
+    port.write('txraw ' + buf2hex(buf) + '\r\n')
+    
+    let p = new Promise((resolve, reject)=>{
+
+      let resolved = false
+
+      let timeout = setTimeout(()=>{
+
+        process.stdout.write('!')
+
+        if(!resolved){resolve()}
+        resolved = true
+      }, 15000)
+
+      resolver = ()=>{ if(!resolved){resolve()}; clearTimeout(timeout); resolved = true }
+    })
+
+    await p
+    //console.log('OK')
+    process.stdout.write('.')
+
+    lastSendComplete = Date.now()
+    counts.sent++
+    stats.lastSendComplete = lastSendComplete
+
+    await waitforme(1337*4)
+  }
+
+  let endTime = Date.now()
+
+  clearInterval(statsTimer)
+}
+
+async function main() {
+  console.log(process.argv)
+  const fileName = process.argv[2]
+  /*let stdinRl = readline.createInterface({
+    input: process.stdin,
+    crlfDelay: Infinity
+  })*/
+  
+
+  let fileStream = fs.createReadStream(fileName)
+
+  //fileStream.read()
+
+  const rl = readline.createInterface({
+    input: fileStream,
+    crlfDelay: Infinity
+  });
+  // crlfDelay option to clean up CR LF to a one line break
+
+  for await (const line of rl) {
+    await handleLine(line)
+  }
+
+  ingestComplete = true
+
+  while(true){
+    await goMaraude()
+  }
+  
+}
+
+main();
