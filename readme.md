@@ -1,5 +1,9 @@
 # mesh marauder
 
+ * Documentation - [meshmarauder.net](https://meshmarauder.net)
+ * Code - [github.com/datapartyjs/meshmarauder](https://github.com/datapartyjs/meshmarauder)
+ * Support - [ko-fi/nullagent](https://ko-fi.com/nullagent)
+
 Features
 
  - packet capture
