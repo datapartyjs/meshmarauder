@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 random4=$(head -c2 /dev/urandom | od -t x2 -An)
 
