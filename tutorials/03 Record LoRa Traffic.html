@@ -1,0 +1,28 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial - Record LoRa traffic</title>
+</head>
+<body>
+    <p>Once you have lorapipe flashed on your hardware, it's time to start
+        capturing traffic. You will need to fetch
+        <a href="https://github.com/datapartyjs/meshmarauder">MeshMarauder</a>,
+        find the serial port that your lorapipe node is running on, and then
+        run the <tt>lora-scanner</tt> tool in the <tt>bin/</tt> directory of
+        the repository. You can  run the following commands to do so: </p>
+
+    <pre>
+    $ git clone https://github.com/datapartyjs/meshmarauder
+    $ cd meshmarauder
+    $ dmesg    # run this after plugging in your lorapipe node, and the
+               # /dev/tty device that appears is what you'll use
+    $ bin/lora-scanner -D &lt;tty&gt; -p 917.25,500.0,7,8,2b
+    </pre>
+
+    <p>This will dump raw packets heard on the Defcon Meshtastic modem preset.
+        You can record this to a file, or pipe it into something else.</p>
+
+</body>
+</html>
