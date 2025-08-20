@@ -1,18 +1,19 @@
 
-import { randomBytes } from '@noble/ciphers/webcrypto.js';
+import { randomBytes } from '@noble/ciphers/webcrypto.js'
 import {fromBinary, toBinary} from '@bufbuild/protobuf'
 import * as protobufs from '@meshtastic/protobufs'
 import { UINT32_MAX } from '@bufbuild/protobuf/wire'
 
-import { ed25519 } from '@noble/curves/ed25519.js';
+import { ed25519, x25519 } from '@noble/curves/ed25519.js'
 import hkdf from '@panva/hkdf'
 
 
 import {
   tryDecryptChannelPacket, encryptChannelPacket,
-   PortNumToProtoBuf, CHANNELS,
-   OUTBOUND_CHANNELS,
-   uint32ToUint8Array
+  tryDecryptDM,
+  PortNumToProtoBuf, CHANNELS,
+  OUTBOUND_CHANNELS,
+  uint32ToUint8Array
 } from './utils.mjs'
 
 export class LorapipeRawPacket {
@@ -30,6 +31,8 @@ export class LorapipeRawPacket {
     this.header = { }
 
     this.parsed = {}
+
+    this.marauderKey = null
 
     if(raw.length == 0) {throw new Error('packet empty') }
 
@@ -84,8 +87,7 @@ export class LorapipeRawPacket {
         this.parsed.decoded = false
       }
 
-    
- 
+  
 
       if(this.parsed.encrypted){
         let key = null
@@ -100,6 +102,8 @@ export class LorapipeRawPacket {
           this.parsed.channel = key
           this.parsed.decrypted = true
           this.parsed.data = data
+        } else {
+          this.raw = raw
         }
 
       }
@@ -183,14 +187,39 @@ export class LorapipeRawPacket {
     return forgedPkt.buffer
   }
 
+  async decryptDM(messagePkt, fromUser){
+    await this.genKey()
+
+    console.log(messagePkt)
+
+    await tryDecryptDM(messagePkt, this, fromUser)
+    
+  }
+
+  /**
+   * 
+   * 
+   * 
+   * @param {Uint8Array} toAddr 
+   * @param {Uint8Array} toPubKey 
+   * @param {string|Uint8Array} text 
+   */
+  async sendDM(toAddr, toPubKey, text){
+    await this.genKey()
+    
+    //
+  }
 
   async genKey(){
-    //if(this.marauderKey != null){ return }
+    if(this.marauderKey != null){ return this.marauderKey }
 
 
     let seed = await hkdf('sha512', this.parsed.content.macaddr, new Uint8Array(32), 'meshmarauder', 32)
 
-    const theKey = ed25519.keygen(seed)
+    
+    //const theKey = ed25519.keygen(seed)
+    const theKey = x25519.keygen(seed)
+    this.marauderKey = theKey
     //console.log(theKey)
     return theKey
   }
@@ -198,7 +227,10 @@ export class LorapipeRawPacket {
   async genPoison(){
     let { publicKey } = await this.genKey()
     this.parsed.content.publicKey = publicKey
-    this.parsed.content.longName = this.parsed.content.longName + '🥷'
+
+    if(this.parsed.content.longName.indexOf('🥷') == -1){
+      this.parsed.content.longName = this.parsed.content.longName + '🥷'
+    }
 
     let scheme = PortNumToProtoBuf[ this.parsed.data.portnum ]
 
@@ -208,18 +240,8 @@ export class LorapipeRawPacket {
 
       let rawPayload = toBinary(protobufs.Mesh.DataSchema, this.parsed.data)
 
-
-
       let ppacketId = randomBytes(4)
       const ppacketIdView = new DataView(ppacketId.buffer)
-
-            /*console.log(CHANNELS[this.parsed.channel])
-      console.log(rawPayload)
-      console.log(uint32ToUint8Array(this.header.from))
-      console.log(ppacketId)*/
-
-
-      //process.exit()
 
       let encPayload = encryptChannelPacket(
         OUTBOUND_CHANNELS[this.parsed.channel] || OUTBOUND_CHANNELS.DEFCONnect,
@@ -248,10 +270,10 @@ export class LorapipeRawPacket {
       hop_start:(this.header.flagsByte & 0xE0) >> 5 */
 
       let flags = (
-        (0xff & 0x7) |
-        (this.header.flagsByte & 0x8) |
-        (this.header.flagsByte & 0x10) |  // mqtt
-        (0xff  & 0xE0)
+        (0xff & 0x7) |                    // hop_limit
+        (this.header.flagsByte & 0x8) |   // want_ack
+        (this.header.flagsByte & 0x10) |  // via_mqtt
+        (0xff  & 0xE0)                    // hop_start
       )
 
       
