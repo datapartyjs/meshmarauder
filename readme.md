@@ -49,12 +49,11 @@ This is a demonstration for DEFCON 33 and not recommended to be used on public d
 ## Example
 
 
-+Log and decode meshtastic
+### Log and decode meshtastic
  
  `./bin/lora-scanner -D /dev/tty_lorapipe0 -p 917.25,500,7,8,2b | ./bin/lora-decoder`
-+
-+
-+Log meshcore
-+
-+`./bin/lora-scanner -D /dev/tty_lorapipe0 -p 910.525,62.5,7,5,12`
+
+Log meshcore
+
+`./bin/lora-scanner -D /dev/tty_lorapipe0 -p 910.525,62.5,7,5,12`
 
