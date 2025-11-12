@@ -24,7 +24,7 @@ Features
 
 ## Join the fun
 
- * Flash [lorapipe](https://github.com/datapartyjs/lorapipe/) to your favorite lora mesh device
+ * Flash [MeshTNC](https://github.com/datapartyjs/MeshTNC) to your favorite lora mesh device
  * Install this repo
  * Run `./lora-scanner.sh` to listen for lora traffic
  * Run `./meshmarauder.sh` to start marauding (coming soon)
