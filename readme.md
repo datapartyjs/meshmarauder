@@ -14,11 +14,11 @@ Features
    * protocol header
    * unencrypted packets
    * encrypted symmetric channel messages
-   * encrypted asymmetric DM messages (coming soon)
+   * encrypted asymmetric DM messages (partial)
  - PKI poisoning
  - User profile tampering
- - public channel impersonation (coming soon)
- - MITM private messages (coming soon)
+ - public channel impersonation 
+ - MITM private messages (partial)
  - Location spoofing (coming soon)
  - Webapp (coming soon)
 
